@@ -1,0 +1,18 @@
+{
+  "name": "HeMa Wedding Live Moments",
+  "short_name": "HeMa Live",
+  "description": "Buku Tamu Digital & Live Momen Pernikahan Hendra & Maya",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#070F1E",
+  "theme_color": "#0A192F",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/wedding-ring.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

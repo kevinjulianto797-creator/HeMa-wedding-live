@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <defs>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FDE68A" />
+      <stop offset="50%" stop-color="#D4AF37" />
+      <stop offset="100%" stop-color="#92640A" />
+    </linearGradient>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#102A43" />
+      <stop offset="100%" stop-color="#070F1E" />
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="24" fill="url(#bgGrad)" stroke="#D4AF37" stroke-width="2"/>
+  <!-- Interlocking wedding rings -->
+  <circle cx="40" cy="52" r="22" stroke="url(#goldGrad)" stroke-width="6" fill="none"/>
+  <circle cx="60" cy="52" r="22" stroke="url(#goldGrad)" stroke-width="6" fill="none"/>
+  <!-- Diamond gem on top -->
+  <polygon points="50,22 56,30 50,38 44,30" fill="#FDE68A" stroke="#FFFFFF" stroke-width="1"/>
+  <circle cx="50" cy="30" r="2" fill="#FFFFFF"/>
+</svg>
