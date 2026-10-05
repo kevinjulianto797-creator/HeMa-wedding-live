@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   ShieldCheck, 
   Lock, 
@@ -21,7 +21,12 @@ import {
   Trash2,
   FileText,
   Search,
-  Sparkles
+  Sparkles,
+  Cloud,
+  Upload,
+  ExternalLink,
+  HelpCircle,
+  FileUp
 } from 'lucide-react';
 import { 
   getWeddingSettings, 
@@ -34,12 +39,18 @@ import {
   exportWishesToCSV,
   getSyncLogs 
 } from '../services/googleSync';
+import { 
+  getCloudflareSettings, 
+  saveCloudflareSettings 
+} from '../services/cloudflareSettings';
 import { getAllCheckins, getAllWishes, getAllMoments } from '../services/db';
 import { 
   getAllGuests, 
   addGuest, 
   deleteGuest, 
-  importGuestsFromText 
+  importGuestsFromExcelFile,
+  downloadGuestTemplateExcel,
+  clearAllGuests 
 } from '../services/guestService';
 import { QRGeneratorModal } from '../components/QRGeneratorModal';
 import { INITIAL_GUESTS } from '../services/mockData';
@@ -48,7 +59,7 @@ export function Admin({ setActivePage }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
-  const [activeTab, setActiveTab] = useState('guests'); // default open 'guests' so user immediately sees how to input guests!
+  const [activeTab, setActiveTab] = useState('guests'); // 'guests' | 'wedding_info' | 'cloudflare' | 'google' | 'export' | 'security'
 
   // Wedding Settings State
   const [weddingForm, setWeddingForm] = useState(getWeddingSettings());
@@ -57,6 +68,10 @@ export function Admin({ setActivePage }) {
   // Google Integration State
   const [googleForm, setGoogleForm] = useState(getGoogleSettings());
   const [googleSaveSuccess, setGoogleSaveSuccess] = useState(false);
+
+  // Cloudflare Settings State
+  const [cfForm, setCfForm] = useState(getCloudflareSettings());
+  const [cfSaveSuccess, setCfSaveSuccess] = useState(false);
 
   // Guest Management State
   const [guestList, setGuestList] = useState([]);
@@ -67,9 +82,11 @@ export function Admin({ setActivePage }) {
   const [newGuestTable, setNewGuestTable] = useState('Meja Reguler');
   const [guestSuccessMsg, setGuestSuccessMsg] = useState('');
 
-  // Bulk Import State
-  const [bulkText, setBulkText] = useState('');
-  const [bulkSuccessMsg, setBulkSuccessMsg] = useState('');
+  // Excel File Upload State
+  const [selectedExcelFile, setSelectedExcelFile] = useState(null);
+  const [isImportingExcel, setIsImportingExcel] = useState(false);
+  const [excelSuccessMsg, setExcelSuccessMsg] = useState('');
+  const fileInputRef = useRef(null);
 
   // QR Modal for viewing/downloading individual guest pass
   const [selectedGuestQr, setSelectedGuestQr] = useState(null);
@@ -121,7 +138,7 @@ export function Admin({ setActivePage }) {
       table: newGuestTable,
     });
 
-    setGuestSuccessMsg(`Tamu "${created.name}" berhasil ditambahkan dengan Token: ${created.qrToken}`);
+    setGuestSuccessMsg(`Tamu "${created.name}" berhasil ditambahkan dengan Token Barcode: ${created.qrToken}`);
     setNewGuestName('');
     setNewGuestPax(1);
     setNewGuestTable('Meja Reguler');
@@ -130,17 +147,32 @@ export function Admin({ setActivePage }) {
     setTimeout(() => setGuestSuccessMsg(''), 4000);
   };
 
-  // 2. Bulk Import Guests
-  const handleBulkImport = async (e) => {
-    e.preventDefault();
-    if (!bulkText.trim()) return;
+  // 2. Upload & Parse Excel File (.xlsx, .xls, .csv)
+  const handleExcelFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedExcelFile(file);
+      setExcelSuccessMsg('');
+    }
+  };
 
-    const imported = await importGuestsFromText(bulkText);
-    setBulkSuccessMsg(`Berhasil mengimpor ${imported.length} tamu sekaligus beserta Barcode/QR masing-masing!`);
-    setBulkText('');
-    await loadData();
+  const handleProcessExcelUpload = async () => {
+    if (!selectedExcelFile) return;
 
-    setTimeout(() => setBulkSuccessMsg(''), 5000);
+    setIsImportingExcel(true);
+    try {
+      const imported = await importGuestsFromExcelFile(selectedExcelFile);
+      setExcelSuccessMsg(`Berhasil mengimpor ${imported.length} tamu dari file Excel "${selectedExcelFile.name}"!`);
+      setSelectedExcelFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      await loadData();
+      setTimeout(() => setExcelSuccessMsg(''), 5000);
+    } catch (err) {
+      console.error('Error importing Excel:', err);
+      alert('Gagal membaca file Excel. Pastikan format file .xlsx, .xls, atau .csv valid.');
+    } finally {
+      setIsImportingExcel(false);
+    }
   };
 
   // 3. Delete Guest
@@ -163,6 +195,13 @@ export function Admin({ setActivePage }) {
     saveGoogleSettings(googleForm);
     setGoogleSaveSuccess(true);
     setTimeout(() => setGoogleSaveSuccess(false), 3000);
+  };
+
+  const handleSaveCloudflareSettings = (e) => {
+    e.preventDefault();
+    saveCloudflareSettings(cfForm);
+    setCfSaveSuccess(true);
+    setTimeout(() => setCfSaveSuccess(false), 3000);
   };
 
   // Export handlers
@@ -243,7 +282,7 @@ export function Admin({ setActivePage }) {
             Panel Admin Pernikahan
           </h2>
           <p className="text-xs text-slate-300">
-            Kelola daftar tamu & barcode, informasi mempelai, integrasi Google, dan keamanan.
+            Kelola daftar tamu, upload file Excel, integrasi Cloudflare & Google, serta keamanan.
           </p>
         </div>
 
@@ -289,6 +328,17 @@ export function Admin({ setActivePage }) {
           <span>Nama & Waktu Acara</span>
         </button>
         <button
+          onClick={() => setActiveTab('cloudflare')}
+          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition ${
+            activeTab === 'cloudflare'
+              ? 'bg-gradient-to-r from-gold-600 to-gold-500 text-navy-950 shadow-gold-glow font-bold'
+              : 'text-slate-300 hover:text-white'
+          }`}
+        >
+          <Cloud className="w-3.5 h-3.5 text-amber-400" />
+          <span>Koneksi Cloudflare</span>
+        </button>
+        <button
           onClick={() => setActiveTab('google')}
           className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition ${
             activeTab === 'google'
@@ -323,7 +373,7 @@ export function Admin({ setActivePage }) {
         </button>
       </div>
 
-      {/* TAB 1: KELOLA TAMU & BARCODE (GUEST & BARCODE MANAGER) */}
+      {/* TAB 1: KELOLA TAMU & UPLOAD EXCEL (.XLSX / .CSV) */}
       {activeTab === 'guests' && (
         <div className="space-y-6">
           {/* Summary Stats */}
@@ -346,16 +396,104 @@ export function Admin({ setActivePage }) {
             </div>
           </div>
 
-          {/* Form 1: Tambah Tamu Satuan */}
-          <div className="glass-navy p-5 sm:p-6 rounded-3xl border border-gold-500/30 shadow-navy-card space-y-4">
+          {/* Form 1: Upload File Excel (.xlsx / .csv) dari File Manager */}
+          <div className="glass-navy p-5 sm:p-6 rounded-3xl border border-gold-500/40 shadow-navy-card space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
+                <div>
+                  <h3 className="font-serif font-bold text-base sm:text-lg text-slate-100">
+                    Upload File Excel Tamu (.xlsx / .csv)
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Pilih file langsung dari laptop / File Manager Anda. Barcode & QR akan dibuatkan otomatis.
+                  </p>
+                </div>
+              </div>
+
+              {/* Download Sample Excel Template */}
+              <button
+                type="button"
+                onClick={downloadGuestTemplateExcel}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-navy-800 hover:bg-navy-700 text-gold-300 border border-gold-500/30 text-xs font-semibold transition"
+                title="Download template Excel dengan kolom contoh"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Unduh Format Template (.xlsx)</span>
+              </button>
+            </div>
+
+            {excelSuccessMsg && (
+              <div className="p-3 bg-emerald-950/80 border border-emerald-500/50 rounded-xl text-xs text-emerald-300 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{excelSuccessMsg}</span>
+              </div>
+            )}
+
+            {/* File Dropzone */}
+            <div className="space-y-3">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx, .xls, .csv"
+                onChange={handleExcelFileSelect}
+                className="hidden"
+                id="excel-file-input"
+              />
+
+              <label
+                htmlFor="excel-file-input"
+                className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gold-500/30 rounded-2xl hover:border-gold-500/60 bg-navy-950/40 cursor-pointer transition"
+              >
+                <FileUp className="w-8 h-8 text-gold-400 mb-2" />
+                {selectedExcelFile ? (
+                  <div className="text-center">
+                    <p className="text-xs font-bold text-gold-300">{selectedExcelFile.name}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Ukuran: {(selectedExcelFile.size / 1024).toFixed(1)} KB (Klik untuk ganti file)
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <p className="text-xs font-bold text-slate-200">
+                      Klik di Sini untuk Memilih File Excel dari Laptop / HP
+                    </p>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Mendukung format Microsoft Excel (.xlsx, .xls) dan CSV
+                    </p>
+                  </div>
+                )}
+              </label>
+
+              {selectedExcelFile && (
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-xs text-slate-300">
+                    File siap diproses ke database dan digenerate QR code.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleProcessExcelUpload}
+                    disabled={isImportingExcel}
+                    className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold text-xs rounded-xl transition shadow-lg flex items-center gap-1.5"
+                  >
+                    <Upload className="w-4 h-4" />
+                    <span>{isImportingExcel ? 'Memproses...' : 'Import File Excel Sekarang'}</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Form 2: Tambah Tamu Satuan */}
+          <div className="glass-navy p-5 sm:p-6 rounded-3xl border border-white/10 shadow-navy-card space-y-4">
             <div className="flex items-center gap-2 pb-3 border-b border-white/10">
               <UserPlus className="w-5 h-5 text-gold-400" />
               <div>
                 <h3 className="font-serif font-bold text-base sm:text-lg text-slate-100">
-                  Tambah Tamu Undangan Baru
+                  Tambah Tamu Satuan (Manual Form)
                 </h3>
                 <p className="text-[11px] text-slate-400">
-                  Sistem akan otomatis membuatkan Barcode & QR Code unik untuk tamu ini.
+                  Tambahkan satu tamu secara instan jika ada tamu susulan.
                 </p>
               </div>
             </div>
@@ -439,51 +577,6 @@ export function Admin({ setActivePage }) {
             </form>
           </div>
 
-          {/* Form 2: Import Massal (Bulk Import) dari Excel */}
-          <div className="glass-navy p-5 sm:p-6 rounded-3xl border border-white/10 shadow-navy-card space-y-4">
-            <div className="flex items-center gap-2 pb-3 border-b border-white/10">
-              <FileText className="w-5 h-5 text-gold-400" />
-              <div>
-                <h3 className="font-serif font-bold text-base sm:text-lg text-slate-100">
-                  Import Massal dari Excel / Teks (Bisa Puluhan/Ratusan Sekaligus)
-                </h3>
-                <p className="text-[11px] text-slate-400">
-                  Cukup salin (copy) baris nama dari Excel lalu tempel (paste) di bawah.
-                </p>
-              </div>
-            </div>
-
-            {bulkSuccessMsg && (
-              <div className="p-3 bg-emerald-950/80 border border-emerald-500/50 rounded-xl text-xs text-emerald-300 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>{bulkSuccessMsg}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleBulkImport} className="space-y-3">
-              <textarea
-                rows={4}
-                value={bulkText}
-                onChange={(e) => setBulkText(e.target.value)}
-                placeholder={`Format baris: Nama Tamu, Kategori, Pax, Meja\n\nContoh:\nBpk. Bambang & Istri, VIP, 2, Meja VIP 01\ndr. Sarah Amanda, Bridesmaid, 2, Meja 04\nRian Pratama, Rekan Kantor, 1, Meja 07`}
-                className="w-full bg-navy-950 border border-gold-500/20 rounded-xl p-3 text-xs text-slate-100 font-mono placeholder-slate-600 focus:outline-none focus:border-gold-400 transition"
-              />
-
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-slate-400">
-                  *Setiap baris otomatis dibuatkan Token QR Code unik secara instan.
-                </span>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-navy-800 hover:bg-navy-700 text-gold-300 border border-gold-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
-                >
-                  <Sparkles className="w-4 h-4 text-gold-400" />
-                  <span>Import Semua Tamu Sekarang</span>
-                </button>
-              </div>
-            </form>
-          </div>
-
           {/* List Tamu & Barcode Pass */}
           <div className="glass-navy p-5 rounded-3xl border border-white/10 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -492,7 +585,7 @@ export function Admin({ setActivePage }) {
                   Daftar Tamu & Barcode Tiket ({filteredGuests.length})
                 </h4>
                 <p className="text-[11px] text-slate-400">
-                  Klik tombol QR untuk melihat/mengunduh gambar QR Code pass masing-masing tamu.
+                  Klik tombol QR untuk mengunduh gambar QR Code pass dan kirim via WhatsApp ke tamu.
                 </p>
               </div>
 
@@ -696,7 +789,98 @@ export function Admin({ setActivePage }) {
         </form>
       )}
 
-      {/* TAB 3: INTEGRASI GOOGLE SHEETS & DRIVE */}
+      {/* TAB 3: KONEKSI CLOUDFLARE (R2 & PAGES) */}
+      {activeTab === 'cloudflare' && (
+        <div className="space-y-6">
+          <form onSubmit={handleSaveCloudflareSettings} className="glass-navy p-5 sm:p-6 rounded-3xl border border-gold-500/30 shadow-navy-card space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <Cloud className="w-5 h-5 text-amber-400" />
+                <h3 className="font-serif font-bold text-lg text-slate-100">
+                  Pengaturan Cloudflare R2 (Penyimpanan Media)
+                </h3>
+              </div>
+              {cfSaveSuccess && (
+                <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Pengaturan Disimpan!</span>
+                </span>
+              )}
+            </div>
+
+            <p className="text-xs text-slate-300">
+              Cloudflare R2 menyediakan kapasitas penyimpanan foto & video gratis 10 GB per bulan dengan <strong>$0 Egress Fee</strong> (bebas biaya streaming bandwidth keluar).
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Nama Bucket Cloudflare R2
+                </label>
+                <input
+                  type="text"
+                  value={cfForm.r2BucketName}
+                  onChange={(e) => setCfForm({ ...cfForm, r2BucketName: e.target.value })}
+                  placeholder="Contoh: hema-wedding-media"
+                  className="w-full bg-navy-950 border border-gold-500/20 rounded-xl p-2.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-gold-400 transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Public Domain / R2 Custom URL (Untuk Link Gambar)
+                </label>
+                <input
+                  type="url"
+                  value={cfForm.r2PublicDomain}
+                  onChange={(e) => setCfForm({ ...cfForm, r2PublicDomain: e.target.value })}
+                  placeholder="https://pub-xxxxxx.r2.dev atau https://media.domainanda.com"
+                  className="w-full bg-navy-950 border border-gold-500/20 rounded-xl p-2.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-gold-400 transition"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  Dapat diperoleh dari menu R2 Bucket Settings → "Public Development URL" atau "Custom Domain".
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="w-full py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-navy-950 font-bold text-xs rounded-xl transition shadow-lg"
+            >
+              Simpan Pengaturan Cloudflare R2
+            </button>
+          </form>
+
+          {/* Panduan Langkah demi Langkah Cloudflare */}
+          <div className="glass-navy p-5 rounded-3xl border border-white/10 space-y-3 text-xs text-slate-300">
+            <h4 className="font-serif font-bold text-slate-100 text-sm flex items-center gap-1.5">
+              <HelpCircle className="w-4 h-4 text-gold-400" />
+              <span>Panduan Menghubungkan ke Cloudflare:</span>
+            </h4>
+
+            <div className="space-y-2 text-slate-300 leading-relaxed">
+              <div className="p-3 bg-navy-950 rounded-xl border border-white/5">
+                <p className="font-bold text-gold-400 mb-1">1. Deploy Hosting via Cloudflare Pages (Gratis & Cepat)</p>
+                <p>
+                  Buka dashboard Cloudflare → <strong>Workers & Pages</strong> → <strong>Create application</strong> → <strong>Pages</strong> → <strong>Connect to Git</strong>.
+                  Pilih repository <code>HeMa-wedding-live</code> Anda. Framework preset: <strong>Vite</strong>. Klik Deploy!
+                </p>
+              </div>
+
+              <div className="p-3 bg-navy-950 rounded-xl border border-white/5">
+                <p className="font-bold text-gold-400 mb-1">2. Buat Bucket R2 untuk Foto Resolusi Tinggi</p>
+                <p>
+                  Buka menu <strong>R2 Object Storage</strong> → <strong>Create bucket</strong> (misal beri nama <code>hema-wedding-media</code>).
+                  Buka tab <strong>Settings</strong> → pada bagian <strong>Public Access</strong>, klik <strong>Enable Public URL</strong> (atau hubungkan Custom Domain).
+                  Salin URL publik tersebut ke formulir di atas.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: INTEGRASI GOOGLE SHEETS & DRIVE */}
       {activeTab === 'google' && (
         <form onSubmit={handleSaveGoogleSettings} className="glass-navy p-5 sm:p-6 rounded-3xl border border-gold-500/30 shadow-navy-card space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-white/10">
@@ -739,7 +923,7 @@ export function Admin({ setActivePage }) {
         </form>
       )}
 
-      {/* TAB 4: EKSPOR DATA CSV */}
+      {/* TAB 5: EKSPOR DATA CSV */}
       {activeTab === 'export' && (
         <div className="glass-navy p-5 sm:p-6 rounded-3xl border border-gold-500/30 shadow-navy-card space-y-4">
           <div className="flex items-center gap-2 pb-3 border-b border-white/10">
@@ -787,7 +971,7 @@ export function Admin({ setActivePage }) {
         </div>
       )}
 
-      {/* TAB 5: KEAMANAN & PIN */}
+      {/* TAB 6: KEAMANAN & PIN */}
       {activeTab === 'security' && (
         <form onSubmit={handleSaveWeddingSettings} className="glass-navy p-5 sm:p-6 rounded-3xl border border-gold-500/30 shadow-navy-card space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-white/10">

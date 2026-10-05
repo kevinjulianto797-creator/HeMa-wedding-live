@@ -1,13 +1,15 @@
-// Guest List & Barcode Management Service
+// Guest List & Barcode Management Service with Excel (.xlsx/.xls/.csv) Support
+import * as XLSX from 'xlsx';
 import { getAppState, setAppState } from './db';
 
 const GUEST_STORAGE_KEY = 'hema_guest_list_master';
 
 // Generate unique, clean QR Token (e.g., HEMA-VIP-8A2F)
 export function generateGuestToken(name = '', category = 'Tamu') {
-  const catPrefix = category.toUpperCase().includes('VIP') 
+  const catUpper = (category || '').toUpperCase();
+  const catPrefix = catUpper.includes('VIP') 
     ? 'VIP' 
-    : category.toUpperCase().includes('KELUARGA') 
+    : catUpper.includes('KELUARGA') 
       ? 'FAM' 
       : 'GST';
   const randomHex = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -65,14 +67,6 @@ export async function addGuest({ name, category, pax, table, notes }) {
   return newGuest;
 }
 
-// Update an existing guest
-export async function updateGuest(id, fields) {
-  const current = await getAllGuests();
-  const updated = current.map((g) => (g.id === id ? { ...g, ...fields } : g));
-  await saveAllGuests(updated);
-  return updated;
-}
-
 // Delete a guest
 export async function deleteGuest(id) {
   const current = await getAllGuests();
@@ -81,39 +75,107 @@ export async function deleteGuest(id) {
   return updated;
 }
 
-// Bulk Import from CSV / Plain Text
-// Format expected per line: Nama, Kategori, Pax, Meja
-// Or simple list of names: Satu nama per baris
-export async function importGuestsFromText(rawText) {
-  const lines = rawText.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+// Clear all guests
+export async function clearAllGuests() {
+  await saveAllGuests([]);
+  return [];
+}
+
+// Parse and Import directly from Excel File (.xlsx, .xls, .csv)
+export function parseExcelFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        // Convert sheet to json array of objects
+        const rawJson = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+        if (!rawJson || rawJson.length === 0) {
+          resolve([]);
+          return;
+        }
+
+        // Smart column mapping (case-insensitive)
+        const guests = rawJson.map((row, idx) => {
+          let name = '';
+          let category = 'Tamu Undangan';
+          let pax = 1;
+          let table = 'Meja Reguler';
+
+          for (const key of Object.keys(row)) {
+            const k = key.trim().toLowerCase();
+            const val = row[key];
+
+            if (k.includes('nama') || k.includes('name') || k.includes('tamu')) {
+              name = String(val).trim();
+            } else if (k.includes('kategori') || k.includes('category') || k.includes('status') || k.includes('hubungan')) {
+              category = String(val).trim() || 'Tamu Undangan';
+            } else if (k.includes('pax') || k.includes('jumlah') || k.includes('orang') || k.includes('kursi')) {
+              pax = parseInt(val, 10) || 1;
+            } else if (k.includes('meja') || k.includes('table') || k.includes('no')) {
+              table = String(val).trim() || 'Meja Reguler';
+            }
+          }
+
+          // If headers weren't named, fallback to row object values
+          if (!name) {
+            const values = Object.values(row).map(v => String(v).trim()).filter(v => v.length > 0);
+            if (values.length > 0) name = values[0];
+            if (values.length > 1) category = values[1];
+            if (values.length > 2) pax = parseInt(values[2], 10) || 1;
+            if (values.length > 3) table = values[3];
+          }
+
+          return {
+            id: `GUEST-${Date.now().toString(36).toUpperCase()}-${idx}_${Math.random().toString(36).slice(2, 5)}`,
+            name: name || `Tamu Undangan #${idx + 1}`,
+            category,
+            pax,
+            table,
+            checkedIn: false,
+            checkedInAt: null,
+            checkedInBy: null,
+            qrToken: generateGuestToken(name, category),
+          };
+        }).filter(g => g.name && g.name.length > 0);
+
+        resolve(guests);
+      } catch (err) {
+        reject(err);
+      }
+    };
+
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// Import Excel File directly and merge with current guests
+export async function importGuestsFromExcelFile(file) {
+  const parsedGuests = await parseExcelFile(file);
   const current = await getAllGuests();
-  const newGuests = [];
-
-  for (const line of lines) {
-    // Check if line contains comma (CSV format)
-    const parts = line.split(',').map((p) => p.trim());
-    const name = parts[0];
-    if (!name) continue;
-
-    const category = parts[1] || 'Tamu Undangan';
-    const pax = parseInt(parts[2], 10) || 1;
-    const table = parts[3] || 'Meja Reguler';
-
-    newGuests.push({
-      id: `GUEST-${Date.now().toString(36).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}_${Math.random().toString(36).slice(2, 5)}`,
-      name,
-      category,
-      pax,
-      table,
-      notes: '',
-      checkedIn: false,
-      checkedInAt: null,
-      checkedInBy: null,
-      qrToken: generateGuestToken(name, category),
-    });
-  }
-
-  const merged = [...newGuests, ...current];
+  const merged = [...parsedGuests, ...current];
   await saveAllGuests(merged);
-  return newGuests;
+  return parsedGuests;
+}
+
+// Download Excel Template for Guests (.xlsx)
+export function downloadGuestTemplateExcel() {
+  const templateData = [
+    { 'Nama Tamu': 'Bpk. Bambang & Istri', 'Kategori': 'VIP / Kehormatan', 'Pax': 2, 'Meja': 'Meja VIP 01' },
+    { 'Nama Tamu': 'dr. Sarah Amanda', 'Kategori': 'Sahabat / Bridesmaid', 'Pax': 2, 'Meja': 'Meja 04' },
+    { 'Nama Tamu': 'Rian Pratama & Partner', 'Kategori': 'Teman Kerja / Rekan Kantor', 'Pax': 2, 'Meja': 'Meja 07' },
+    { 'Nama Tamu': 'Keluarga Bpk. H. Ridwan', 'Kategori': 'Keluarga Mempelai Pria', 'Pax': 4, 'Meja': 'Meja Keluarga 02' },
+  ];
+
+  const ws = XLSX.utils.json_to_sheet(templateData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Daftar_Tamu');
+  XLSX.writeFile(wb, 'Template_Daftar_Tamu_HeMa_Wedding.xlsx');
 }
