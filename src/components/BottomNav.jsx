@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, QrCode, Image, MessageSquareHeart, Tv } from 'lucide-react';
+import { Home, QrCode, Image, MessageSquareHeart } from 'lucide-react';
 
 export function BottomNav({ activePage, setActivePage }) {
   const navItems = [
@@ -7,12 +7,11 @@ export function BottomNav({ activePage, setActivePage }) {
     { id: 'checkin', label: 'Check-in', icon: QrCode, highlight: true },
     { id: 'moments', label: 'Galeri', icon: Image },
     { id: 'wishes', label: 'Ucapan', icon: MessageSquareHeart },
-    { id: 'live', label: 'Proyektor', icon: Tv },
   ];
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 glass-navy border-t border-gold-500/20 backdrop-blur-xl sm:hidden">
-      <div className="flex items-center justify-around px-2 py-2">
+      <div className="flex items-center justify-around px-4 py-2">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activePage === item.id;
@@ -48,7 +47,7 @@ export function BottomNav({ activePage, setActivePage }) {
             <button
               key={item.id}
               onClick={() => setActivePage(item.id)}
-              className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition ${
+              className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${
                 isActive
                   ? 'text-gold-400 font-semibold'
                   : 'text-slate-400 hover:text-slate-200'

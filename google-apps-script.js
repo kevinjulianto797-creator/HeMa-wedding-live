@@ -1,79 +1,318 @@
 /**
- * GOOGLE APPS SCRIPT WEBHOOK UNTUK HEMAS WEDDING LIVE
+ * ============================================================================
+ * GOOGLE APPS SCRIPT: AUTO-SETUP DATABASE & GOOGLE DRIVE INTEGRATION
+ * PROYEK: HeMa Wedding Live Moments
+ * ============================================================================
  * 
- * Cara Penggunaan:
- * 1. Buat Google Spreadsheet baru di Google Drive Anda (misal nama: "Data Tamu HeMa Wedding").
- * 2. Buat 2 sheet di dalamnya:
- *    - Sheet 1 beri nama: "Kehadiran"
- *    - Sheet 2 beri nama: "Ucapan"
- * 3. Di Google Spreadsheet, klik menu: Ekstensi > Apps Script.
- * 4. Hapus semua kode yang ada, lalu paste seluruh kode di bawah ini.
- * 5. Klik tombol "Terapkan" (Deploy) > "Penerapan Baru" (New Deployment).
- * 6. Pilih Jenis: "Aplikasi Web" (Web App).
- * 7. Konfigurasi:
+ * FITUR:
+ * 1. Setup Database Otomatis: Membuat 4 Sheet rapi dengan styling header
+ *    (Daftar_Undangan, Kehadiran, Ucapan_Doa, Galeri_Media).
+ * 2. Setup Google Drive Otomatis: Membuat folder utama "HeMa Wedding Moments"
+ *    beserta 3 subfolder terpisah (Foto_Fotografer, Momen_Tamu, Voice_Notes).
+ * 3. Auto File Upload: Otomatis menyimpan file foto, video, dan rekaman audio
+ *    voice note tamu/fotografer langsung ke Google Drive dan mencatat link-nya.
+ * 
+ * CARA PAKAI:
+ * 1. Buat Google Spreadsheet baru di Google Drive Anda.
+ * 2. Klik menu: Ekstensi > Apps Script.
+ * 3. Hapus semua isi file Code.gs, lalu paste seluruh script ini.
+ * 4. Simpan (Ctrl + S), lalu reload Google Spreadsheet Anda.
+ * 5. Akan muncul menu baru di atas: "💍 HeMa Wedding" > klik "⚙️ Setup Database & Drive Otomatis".
+ * 6. Klik "Terapkan (Deploy)" > "Penerapan Baru (New Deployment)" > Aplikasi Web (Web App):
  *    - Jalankan sebagai: "Saya" (Akun Google Anda)
- *    - Yang memiliki akses: "Siapa saja" (Anyone)
- * 8. Klik Terapkan dan salin URL Webhook yang dihasilkan.
- * 9. Masukkan URL tersebut ke menu Panel Admin aplikasi (di tab Pengaturan Google Sheets).
+ *    - Siapa saja yang memiliki akses: "Siapa saja" (Anyone)
+ * 7. Salin URL Webhook dan masukkan ke Panel Admin aplikasi.
  */
 
+// 1. Menu Otomatis di Google Sheets
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('💍 HeMa Wedding')
+    .addItem('⚙️ Setup Database & Folder Drive Otomatis', 'setupDatabase')
+    .addItem('📁 Buka Folder Google Drive Media', 'openDriveFolder')
+    .addItem('ℹ️ Cek Info Webhook', 'showWebhookInfo')
+    .addToUi();
+}
+
+// 2. Setup Database & Folder Drive Otomatis Sekali Klik
+function setupDatabase() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = SpreadsheetApp.getUi();
+
+  try {
+    // --- A. SETUP FOLDER GOOGLE DRIVE ---
+    var rootFolderName = "HeMa Wedding Live - Master Media";
+    var rootFolders = DriveApp.getFoldersByName(rootFolderName);
+    var rootFolder;
+
+    if (rootFolders.hasNext()) {
+      rootFolder = rootFolders.next();
+    } else {
+      rootFolder = DriveApp.createFolder(rootFolderName);
+      rootFolder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    }
+
+    // Subfolder 1: Foto Fotografer
+    var photoFolder = getOrCreateSubfolder(rootFolder, "01_Foto_Fotografer");
+    // Subfolder 2: Momen Tamu
+    var guestFolder = getOrCreateSubfolder(rootFolder, "02_Momen_Tamu");
+    // Subfolder 3: Voice Notes (Audio Doa)
+    var voiceFolder = getOrCreateSubfolder(rootFolder, "03_Voice_Notes_Audio");
+
+    // Simpan ID folder ke ScriptProperties
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty("ROOT_FOLDER_ID", rootFolder.getId());
+    props.setProperty("FOTO_FOLDER_ID", photoFolder.getId());
+    props.setProperty("TAMU_FOLDER_ID", guestFolder.getId());
+    props.setProperty("VOICE_FOLDER_ID", voiceFolder.getId());
+
+    // --- B. SETUP SHEETS DENGAN STYLING NAVY & GOLD ---
+    
+    // 1. Sheet: Kehadiran (Check-in Realtime)
+    var sheetHadir = getOrCreateSheet(ss, "Kehadiran");
+    sheetHadir.clear();
+    var hadirHeaders = [["Timestamp", "ID Tamu", "Nama Tamu", "Kategori", "Pax", "Meja", "Metode Checkin"]];
+    sheetHadir.getRange(1, 1, 1, hadirHeaders[0].length).setValues(hadirHeaders);
+    formatSheetHeader(sheetHadir, hadirHeaders[0].length);
+
+    // 2. Sheet: Ucapan_Doa (Teks & Voice Note)
+    var sheetUcapan = getOrCreateSheet(ss, "Ucapan_Doa");
+    sheetUcapan.clear();
+    var ucapanHeaders = [["Timestamp", "Nama Pengirim", "Hubungan", "Tipe", "Durasi VN (detik)", "Pesan Doa / Transkrip", "Link File Audio di Drive"]];
+    sheetUcapan.getRange(1, 1, 1, ucapanHeaders[0].length).setValues(ucapanHeaders);
+    formatSheetHeader(sheetUcapan, ucapanHeaders[0].length);
+
+    // 3. Sheet: Galeri_Media (Foto & Video Fotografer & Tamu)
+    var sheetMedia = getOrCreateSheet(ss, "Galeri_Media");
+    sheetMedia.clear();
+    var mediaHeaders = [["Timestamp", "Nama Pengunggah", "Peran (Role)", "Kategori Momen", "Caption / Cerita", "Tipe Media", "Link File di Google Drive"]];
+    sheetMedia.getRange(1, 1, 1, mediaHeaders[0].length).setValues(mediaHeaders);
+    formatSheetHeader(sheetMedia, mediaHeaders[0].length);
+
+    // 4. Sheet: Daftar_Undangan (Master Tamu)
+    var sheetUndangan = getOrCreateSheet(ss, "Daftar_Undangan");
+    if (sheetUndangan.getLastRow() === 0) {
+      var undanganHeaders = [["ID Tamu", "Nama Tamu", "Kategori", "Pax", "Meja", "Token QR", "Status Hadir", "Jam Kehadiran"]];
+      sheetUndangan.getRange(1, 1, 1, undanganHeaders[0].length).setValues(undanganHeaders);
+      formatSheetHeader(sheetUndangan, undanganHeaders[0].length);
+
+      // Berikan data template contoh
+      var sampleGuests = [
+        ["GUEST-001", "Bpk. Ahmad Fauzi & Keluarga", "VIP / Tamu Kehormatan", 2, "Meja VIP 01", "HEMA-VIP-AF001", "Belum Hadir", "-"],
+        ["GUEST-002", "Ibu Ratna Dewi, S.E.", "Keluarga Mempelai Pria", 3, "Meja Keluarga 02", "HEMA-FAM-RD002", "Belum Hadir", "-"],
+        ["GUEST-003", "Dimas Wicaksono", "Sahabat SMA / Groomsmen", 1, "Meja Sahabat 05", "HEMA-FRN-DW003", "Belum Hadir", "-"],
+        ["GUEST-004", "dr. Sarah Amanda", "Sahabat Kuliah / Bridesmaid", 2, "Meja Bridesmaid 04", "HEMA-BRD-SA004", "Belum Hadir", "-"]
+      ];
+      sheetUndangan.getRange(2, 1, sampleGuests.length, sampleGuests[0].length).setValues(sampleGuests);
+    }
+
+    // Hapus Sheet1 bawaan kosong jika ada
+    var defaultSheet = ss.getSheetByName("Sheet1");
+    if (defaultSheet && ss.getSheets().length > 1) {
+      ss.deleteSheet(defaultSheet);
+    }
+
+    ui.alert(
+      "Setup Berhasil!",
+      "Database Google Sheets dan Folder Google Drive telah dibuat secara otomatis!\n\n" +
+      "📁 Folder Utama: " + rootFolderName + "\n" +
+      "├── 01_Foto_Fotografer\n" +
+      "├── 02_Momen_Tamu\n" +
+      "└── 03_Voice_Notes_Audio\n\n" +
+      "Sekarang silakan klik tombol Terapkan (Deploy) > Penerapan Baru > Aplikasi Web untuk mendapatkan Webhook URL.",
+      ui.ButtonSet.OK
+    );
+
+  } catch (err) {
+    ui.alert("Gagal Setup: " + err.toString());
+  }
+}
+
+// 3. Webhook Receiver (doPost) dari Frontend PWA
 function doPost(e) {
   try {
     var rawData = e.postData.contents;
     var data = JSON.parse(rawData);
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var props = PropertiesService.getScriptProperties();
 
-    // 1. Catat Kehadiran (Check-In)
+    // A. ACTION: CHECK-IN TAMU
     if (data.action === "CHECK_IN") {
       var sheetHadir = ss.getSheetByName("Kehadiran");
-      if (!sheetHadir) {
-        sheetHadir = ss.insertSheet("Kehadiran");
-        sheetHadir.appendRow(["Timestamp", "ID Tamu", "Nama Tamu", "Kategori", "Pax", "Petugas/Metode"]);
-      }
-      
+      if (!sheetHadir) sheetHadir = getOrCreateSheet(ss, "Kehadiran");
+
       sheetHadir.appendRow([
         new Date(data.timestamp || new Date()),
         data.guestId || "-",
         data.guestName,
         data.category || "Tamu Undangan",
         data.pax || 1,
-        data.checkedInBy || "Scanner"
+        data.table || "-",
+        data.checkedInBy || "Scanner Barcode"
       ]);
 
-      return ContentService.createTextOutput(JSON.stringify({ status: "success", type: "checkin" }))
-        .setMimeType(ContentService.MimeType.JSON);
+      // Update status di sheet Daftar_Undangan jika ada
+      updateGuestStatusInMaster(ss, data.guestId, data.guestName);
+
+      return sendJsonResponse({ status: "success", type: "checkin" });
     }
 
-    // 2. Catat Ucapan & Voice Note
+    // B. ACTION: UCAPAN DOA & VOICE NOTE
     if (data.action === "NEW_WISH") {
-      var sheetUcapan = ss.getSheetByName("Ucapan");
-      if (!sheetUcapan) {
-        sheetUcapan = ss.insertSheet("Ucapan");
-        sheetUcapan.appendRow(["Timestamp", "Nama Pengirim", "Hubungan", "Tipe", "Durasi VN (detik)", "Pesan Doa"]);
+      var sheetUcapan = ss.getSheetByName("Ucapan_Doa");
+      if (!sheetUcapan) sheetUcapan = getOrCreateSheet(ss, "Ucapan_Doa");
+
+      var driveAudioUrl = "-";
+
+      // Jika ada lampiran rekaman suara (Voice Note Base64) -> simpan ke Drive
+      if (data.audioBase64) {
+        var voiceFolderId = props.getProperty("VOICE_FOLDER_ID");
+        var voiceFolder = voiceFolderId ? DriveApp.getFolderById(voiceFolderId) : DriveApp.getRootFolder();
+        var fileName = "VN_" + sanitizeName(data.senderName) + "_" + Date.now() + ".webm";
+        var decodedAudio = Utilities.base64Decode(data.audioBase64);
+        var blob = Utilities.newBlob(decodedAudio, "audio/webm", fileName);
+        var file = voiceFolder.createFile(blob);
+        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        driveAudioUrl = file.getUrl();
       }
 
       sheetUcapan.appendRow([
         new Date(data.timestamp || new Date()),
         data.senderName,
         data.relationship || "Teman",
-        data.type === "voice" ? "Voice Note" : "Teks",
+        data.type === "voice" ? "Voice Note (Audio)" : "Pesan Teks",
         data.audioDuration || 0,
-        data.message || ""
+        data.message || "",
+        driveAudioUrl
       ]);
 
-      return ContentService.createTextOutput(JSON.stringify({ status: "success", type: "wish" }))
-        .setMimeType(ContentService.MimeType.JSON);
+      return sendJsonResponse({ status: "success", type: "wish", driveUrl: driveAudioUrl });
     }
 
-    return ContentService.createTextOutput(JSON.stringify({ status: "unknown action" }))
-      .setMimeType(ContentService.MimeType.JSON);
+    // C. ACTION: UPLOAD FOTO / VIDEO MEDIA (Fotografer atau Tamu)
+    if (data.action === "UPLOAD_MEDIA") {
+      var sheetMedia = ss.getSheetByName("Galeri_Media");
+      if (!sheetMedia) sheetMedia = getOrCreateSheet(ss, "Galeri_Media");
+
+      var driveMediaUrl = "-";
+
+      if (data.fileBase64) {
+        var targetFolderId = data.uploaderRole === "photographer"
+          ? props.getProperty("FOTO_FOLDER_ID")
+          : props.getProperty("TAMU_FOLDER_ID");
+
+        var targetFolder = targetFolderId ? DriveApp.getFolderById(targetFolderId) : DriveApp.getRootFolder();
+        var mime = data.mimeType || "image/jpeg";
+        var ext = mime.indexOf("video") >= 0 ? ".mp4" : ".jpg";
+        var mediaFileName = (data.uploaderRole === "photographer" ? "OFFICIAL_" : "GUEST_") +
+          sanitizeName(data.uploaderName) + "_" + Date.now() + ext;
+
+        var decodedMedia = Utilities.base64Decode(data.fileBase64);
+        var mediaBlob = Utilities.newBlob(decodedMedia, mime, mediaFileName);
+        var mediaFile = targetFolder.createFile(mediaBlob);
+        mediaFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        driveMediaUrl = mediaFile.getUrl();
+      }
+
+      sheetMedia.appendRow([
+        new Date(data.timestamp || new Date()),
+        data.uploaderName,
+        data.uploaderRole || "guest",
+        data.category || "Momen Bahagia",
+        data.caption || "",
+        data.type || "photo",
+        driveMediaUrl
+      ]);
+
+      return sendJsonResponse({ status: "success", type: "media", driveUrl: driveMediaUrl });
+    }
+
+    return sendJsonResponse({ status: "unknown_action" });
 
   } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: error.toString() }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return sendJsonResponse({ status: "error", message: error.toString() });
   }
 }
 
 function doGet(e) {
-  return ContentService.createTextOutput("Webhook HeMa Wedding Live aktif dan siap menerima data!");
+  return ContentService.createTextOutput("Webhook HeMa Wedding Live Aktif dan Terhubung ke Google Sheets & Drive!")
+    .setMimeType(ContentService.MimeType.TEXT);
+}
+
+// --- HELPER FUNCTIONS ---
+
+function formatSheetHeader(sheet, numCols) {
+  var headerRange = sheet.getRange(1, 1, 1, numCols);
+  headerRange
+    .setBackground("#0A192F") // Deep Midnight Navy
+    .setFontColor("#D4AF37")   // Champagne Gold
+    .setFontWeight("bold")
+    .setFontSize(10)
+    .setHorizontalAlignment("center");
+  sheet.setFrozenRows(1);
+  sheet.setRowHeight(1, 32);
+  for (var i = 1; i <= numCols; i++) {
+    sheet.autoResizeColumn(i);
+  }
+}
+
+function getOrCreateSheet(ss, sheetName) {
+  var s = ss.getSheetByName(sheetName);
+  if (!s) s = ss.insertSheet(sheetName);
+  return s;
+}
+
+function getOrCreateSubfolder(parentFolder, subfolderName) {
+  var iter = parentFolder.getFoldersByName(subfolderName);
+  if (iter.hasNext()) return iter.next();
+  var sub = parentFolder.createFolder(subfolderName);
+  sub.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return sub;
+}
+
+function sanitizeName(name) {
+  if (!name) return "Anonim";
+  return name.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 20);
+}
+
+function updateGuestStatusInMaster(ss, guestId, guestName) {
+  var sheetUndangan = ss.getSheetByName("Daftar_Undangan");
+  if (!sheetUndangan) return;
+  var data = sheetUndangan.getDataRange().getValues();
+  for (var r = 1; r < data.length; r++) {
+    if ((guestId && data[r][0] == guestId) || (guestName && data[r][1] == guestName)) {
+      sheetUndangan.getRange(r + 1, 7).setValue("Hadir");
+      sheetUndangan.getRange(r + 1, 8).setValue(new Date().toLocaleTimeString("id-ID"));
+      break;
+    }
+  }
+}
+
+function openDriveFolder() {
+  var props = PropertiesService.getScriptProperties();
+  var rootId = props.getProperty("ROOT_FOLDER_ID");
+  if (rootId) {
+    var folder = DriveApp.getFolderById(rootId);
+    SpreadsheetApp.getUi().alert("Link Google Drive:", folder.getUrl(), SpreadsheetApp.getUi().ButtonSet.OK);
+  } else {
+    SpreadsheetApp.getUi().alert("Jalankan setup database otomatis terlebih dahulu!");
+  }
+}
+
+function showWebhookInfo() {
+  SpreadsheetApp.getUi().alert(
+    "Cara Mendapatkan Webhook URL:",
+    "1. Klik tombol 'Terapkan' (Deploy) di kanan atas editor Apps Script.\n" +
+    "2. Pilih 'Penerapan Baru' (New Deployment).\n" +
+    "3. Pilih jenis: 'Aplikasi Web' (Web App).\n" +
+    "4. 'Jalankan sebagai': Saya.\n" +
+    "5. 'Yang memiliki akses': Siapa saja (Anyone).\n" +
+    "6. Klik Terapkan dan salin URL-nya ke Panel Admin aplikasi Anda.",
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
+
+function sendJsonResponse(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
 }

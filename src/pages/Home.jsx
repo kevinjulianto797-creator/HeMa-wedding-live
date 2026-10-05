@@ -9,8 +9,7 @@ import {
   Users, 
   Image, 
   Heart,
-  ChevronRight,
-  Tv
+  ChevronRight
 } from 'lucide-react';
 import { getAllCheckins, getAllWishes, getAllMoments } from '../services/db';
 import { getWeddingSettings } from '../services/weddingSettings';
@@ -260,27 +259,6 @@ export function Home({ setActivePage }) {
           </div>
         </section>
       )}
-
-      {/* Projector TV Banner */}
-      <section 
-        onClick={() => setActivePage('live')}
-        className="cursor-pointer glass-gold rounded-2xl p-4 sm:p-5 flex items-center justify-between group hover:border-gold-400 transition"
-      >
-        <div className="flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-gold-500 text-navy-950 flex items-center justify-center shrink-0">
-            <Tv className="w-5 h-5" />
-          </div>
-          <div>
-            <h4 className="font-serif font-bold text-sm sm:text-base text-gold-300 group-hover:text-gold-200">
-              Tampilkan di Layar TV / Proyektor Gedung
-            </h4>
-            <p className="text-xs text-slate-300">
-              Live slideshow foto fotografer dan ucapan tamu secara otomatis.
-            </p>
-          </div>
-        </div>
-        <ChevronRight className="w-5 h-5 text-gold-400 group-hover:translate-x-1 transition shrink-0" />
-      </section>
     </div>
   );
 }

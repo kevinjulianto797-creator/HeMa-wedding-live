@@ -6,15 +6,15 @@ export function getGoogleSettings() {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
     return raw ? JSON.parse(raw) : {
-      sheetsWebhookUrl: '', // URL Google Apps Script Webhook or Cloudflare Worker endpoint
-      driveFolderId: 'FOLDER_HEMA_WEDDING_MOMENTS',
+      sheetsWebhookUrl: '', // URL Google Apps Script Webhook
+      driveFolderId: '',
       autoSyncToDrive: true,
       lastSyncTimestamp: null,
     };
   } catch {
     return {
       sheetsWebhookUrl: '',
-      driveFolderId: 'FOLDER_HEMA_WEDDING_MOMENTS',
+      driveFolderId: '',
       autoSyncToDrive: true,
       lastSyncTimestamp: null,
     };
@@ -23,6 +23,20 @@ export function getGoogleSettings() {
 
 export function saveGoogleSettings(settings) {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+}
+
+// Convert Blob / File to Base64 String
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      // Result is data:mime;base64,XXXX -> split after comma
+      const base64String = reader.result.split(',')[1];
+      resolve(base64String);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 }
 
 // 1. Sync Checkin to Google Sheet
@@ -35,47 +49,15 @@ export async function syncCheckinToGoogle(checkin) {
     guestName: checkin.guestName,
     pax: checkin.pax,
     category: checkin.category,
+    table: checkin.table || '-',
     checkedInBy: checkin.checkedInBy,
   };
 
-  // If webhook is provided, send real HTTP POST
   if (settings.sheetsWebhookUrl && settings.sheetsWebhookUrl.startsWith('http')) {
     try {
       await fetch(settings.sheetsWebhookUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        mode: 'no-cors', // standard for GAS webhooks
-      });
-    } catch (e) {
-      console.warn('Webhook POST error:', e);
-    }
-  }
-
-  // Record audit log in localStorage
-  addAuditLog('CHECK_IN', `${checkin.guestName} (${checkin.category}) tercatat hadir.`);
-  return { success: true };
-}
-
-// 2. Sync Wish & Voice Note to Google Sheet & Drive
-export async function syncWishToGoogle(wish) {
-  const settings = getGoogleSettings();
-  const payload = {
-    action: 'NEW_WISH',
-    timestamp: wish.timestamp,
-    senderName: wish.senderName,
-    relationship: wish.relationship,
-    type: wish.type,
-    message: wish.message,
-    audioDuration: wish.audioDuration,
-    hasAudio: !!wish.audioBlob,
-  };
-
-  if (settings.sheetsWebhookUrl && settings.sheetsWebhookUrl.startsWith('http')) {
-    try {
-      await fetch(settings.sheetsWebhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify(payload),
         mode: 'no-cors',
       });
@@ -84,13 +66,93 @@ export async function syncWishToGoogle(wish) {
     }
   }
 
-  addAuditLog('WISH', `Ucapan dari ${wish.senderName} [${wish.type.toUpperCase()}] disinkronisasi.`);
+  addAuditLog('CHECK_IN', `${checkin.guestName} (${checkin.category}) tercatat hadir.`);
   return { success: true };
 }
 
-// 3. Sync Moment (Photo/Video) to Cloudflare R2 / Drive
+// 2. Sync Wish & Voice Note to Google Sheet & Drive
+export async function syncWishToGoogle(wish) {
+  const settings = getGoogleSettings();
+  let audioBase64 = null;
+
+  if (wish.audioBlob instanceof Blob) {
+    try {
+      audioBase64 = await blobToBase64(wish.audioBlob);
+    } catch (err) {
+      console.warn('Error converting audio blob to base64:', err);
+    }
+  }
+
+  const payload = {
+    action: 'NEW_WISH',
+    timestamp: wish.timestamp,
+    senderName: wish.senderName,
+    relationship: wish.relationship,
+    type: wish.type,
+    message: wish.message,
+    audioDuration: wish.audioDuration,
+    audioBase64: audioBase64, // Automatically saved to Google Drive 03_Voice_Notes folder!
+  };
+
+  if (settings.sheetsWebhookUrl && settings.sheetsWebhookUrl.startsWith('http')) {
+    try {
+      await fetch(settings.sheetsWebhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload),
+        mode: 'no-cors',
+      });
+    } catch (e) {
+      console.warn('Webhook POST error:', e);
+    }
+  }
+
+  addAuditLog('WISH', `Ucapan dari ${wish.senderName} [${wish.type.toUpperCase()}] disinkronkan ke Sheet & Drive.`);
+  return { success: true };
+}
+
+// 3. Sync Moment (Photo/Video) to Google Drive & Sheet
 export async function syncMediaToGoogle(moment) {
-  addAuditLog('MEDIA', `Media "${moment.caption || 'Foto Momen'}" di-upload oleh ${moment.uploaderName}.`);
+  const settings = getGoogleSettings();
+  let fileBase64 = null;
+
+  if (moment.fileBlob instanceof Blob) {
+    try {
+      fileBase64 = await blobToBase64(moment.fileBlob);
+    } catch (err) {
+      console.warn('Error converting media blob to base64:', err);
+    }
+  } else if (moment.previewUrl && moment.previewUrl.startsWith('data:')) {
+    // If previewUrl is already a data-url
+    fileBase64 = moment.previewUrl.split(',')[1];
+  }
+
+  const payload = {
+    action: 'UPLOAD_MEDIA',
+    timestamp: moment.timestamp,
+    uploaderName: moment.uploaderName,
+    uploaderRole: moment.uploaderRole,
+    type: moment.type,
+    category: moment.category,
+    caption: moment.caption,
+    fileBase64: fileBase64, // Saved directly into Google Drive folder!
+    mimeType: moment.type === 'video' ? 'video/mp4' : 'image/jpeg',
+  };
+
+  if (settings.sheetsWebhookUrl && settings.sheetsWebhookUrl.startsWith('http')) {
+    try {
+      await fetch(settings.sheetsWebhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload),
+        mode: 'no-cors',
+      });
+    } catch (e) {
+      console.warn('Webhook POST error:', e);
+    }
+  }
+
+  addAuditLog('MEDIA', `Media "${moment.caption || 'Foto Momen'}" di-upload oleh ${moment.uploaderName} ke Drive.`);
   return { success: true };
 }
 
@@ -118,7 +180,7 @@ export function getSyncLogs() {
   }
 }
 
-// 4. Instant 1-Click Export to CSV (Openable in Excel / Google Sheets)
+// 4. Instant 1-Click Export to CSV
 export function exportCheckinsToCSV(checkins) {
   const headers = ['ID', 'Nama Tamu', 'Kategori', 'Pax', 'Waktu Kehadiran', 'Metode Checkin', 'Status Sync'];
   const rows = checkins.map(c => [

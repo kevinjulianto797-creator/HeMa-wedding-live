@@ -14,7 +14,8 @@ import {
   Users,
   History,
   RefreshCw,
-  Clock
+  Clock,
+  Tv
 } from 'lucide-react';
 import { 
   getWeddingSettings, 
@@ -165,12 +166,21 @@ export function Admin({ setActivePage }) {
           </p>
         </div>
 
-        <button
-          onClick={() => setIsAuthenticated(false)}
-          className="text-xs text-slate-400 hover:text-slate-200 underline"
-        >
-          Kunci Kembali
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setActivePage('live')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gold-500/20 text-gold-300 border border-gold-500/40 text-xs font-semibold hover:bg-gold-500/30 transition shadow-gold-glow"
+          >
+            <Tv className="w-3.5 h-3.5" />
+            <span>Buka Layar Proyektor</span>
+          </button>
+          <button
+            onClick={() => setIsAuthenticated(false)}
+            className="text-xs text-slate-400 hover:text-slate-200 underline"
+          >
+            Kunci Kembali
+          </button>
+        </div>
       </div>
 
       {/* Tabs Selector */}

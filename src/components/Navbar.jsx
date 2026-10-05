@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { RefreshCw, Tv } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { syncService } from '../services/syncService';
 import { getWeddingSettings } from '../services/weddingSettings';
 
@@ -53,7 +53,7 @@ export function Navbar({ activePage, setActivePage }) {
     syncService.syncAll();
   };
 
-  // Secret Easter Egg for Admin
+  // Secret Easter Egg for Admin (5 taps on couple logo)
   const handleLogoTap = () => {
     tapCountRef.current += 1;
     if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
@@ -100,22 +100,8 @@ export function Navbar({ activePage, setActivePage }) {
           </div>
         </div>
 
-        {/* Right Status Actions (Admin button removed - completely hidden!) */}
+        {/* Right Status Actions (Clean & for guests only) */}
         <div className="flex items-center gap-2">
-          {/* TV Projector Link */}
-          <button
-            onClick={() => setActivePage('live')}
-            title="Buka Mode Layar TV / Proyektor Gedung"
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition ${
-              activePage === 'live'
-                ? 'bg-gold-500 text-navy-950 border-gold-400 font-semibold'
-                : 'bg-navy-800/80 text-gold-300 border-gold-500/30 hover:bg-navy-700'
-            }`}
-          >
-            <Tv className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Layar Proyektor</span>
-          </button>
-
           {/* Pending Sync / Offline Indicator */}
           {pendingCount > 0 && (
             <button
