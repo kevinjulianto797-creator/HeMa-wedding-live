@@ -19,6 +19,7 @@ import { QRGeneratorModal } from '../components/QRGeneratorModal';
 import { INITIAL_GUESTS } from '../services/mockData';
 import { saveCheckin, getAllCheckins, setAppState, getAppState } from '../services/db';
 import { syncService } from '../services/syncService';
+import { getAllGuests } from '../services/guestService';
 
 export function CheckIn() {
   const [activeTab, setActiveTab] = useState('receptionist'); // 'receptionist' | 'self'
@@ -29,14 +30,14 @@ export function CheckIn() {
   const [successGuest, setSuccessGuest] = useState(null);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
-  // Load guests and checkins from IndexedDB
+  // Load guests and checkins from IndexedDB / guestService
   useEffect(() => {
     const loadCheckins = async () => {
       try {
-        const saved = await getAppState('guest_list');
+        const saved = await getAllGuests();
         const checkins = await getAllCheckins();
         
-        let currentGuests = saved || INITIAL_GUESTS;
+        let currentGuests = saved && saved.length > 0 ? saved : INITIAL_GUESTS;
         
         // Merge checkedIn state
         currentGuests = currentGuests.map(g => {
@@ -59,12 +60,16 @@ export function CheckIn() {
     };
 
     loadCheckins();
+    window.addEventListener('wedding-guests-updated', loadCheckins);
 
     const unsubscribe = syncService.subscribe((status) => {
       setIsOnline(status.isOnline);
     });
 
-    return () => unsubscribe();
+    return () => {
+      window.removeEventListener('wedding-guests-updated', loadCheckins);
+      unsubscribe();
+    };
   }, []);
 
   // Filtered guests

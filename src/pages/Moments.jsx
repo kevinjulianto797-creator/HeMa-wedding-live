@@ -55,22 +55,11 @@ export function Moments() {
   const loadMoments = async () => {
     try {
       const dbMoments = await getAllMoments();
-      if (dbMoments && dbMoments.length > 0) {
-        // Merge with initial if needed or use dbMoments
-        const merged = [...dbMoments];
-        INITIAL_MOMENTS.forEach((im) => {
-          if (!merged.find((m) => m.id === im.id)) {
-            merged.push(im);
-          }
-        });
-        setMoments(merged);
-      } else {
-        // Save initial to db
-        for (const m of INITIAL_MOMENTS) {
-          await saveMoment(m);
-        }
-        setMoments(INITIAL_MOMENTS);
-      }
+      // Filter out any unsplash dummy photos
+      const realMoments = (dbMoments || []).filter(
+        (m) => !m.previewUrl?.includes('images.unsplash.com')
+      );
+      setMoments(realMoments);
     } catch (e) {
       console.error('Error loading moments:', e);
     }

@@ -15,7 +15,13 @@ import {
   History,
   RefreshCw,
   Clock,
-  Tv
+  Tv,
+  UserPlus,
+  QrCode,
+  Trash2,
+  FileText,
+  Search,
+  Sparkles
 } from 'lucide-react';
 import { 
   getWeddingSettings, 
@@ -29,13 +35,20 @@ import {
   getSyncLogs 
 } from '../services/googleSync';
 import { getAllCheckins, getAllWishes, getAllMoments } from '../services/db';
-import { syncService } from '../services/syncService';
+import { 
+  getAllGuests, 
+  addGuest, 
+  deleteGuest, 
+  importGuestsFromText 
+} from '../services/guestService';
+import { QRGeneratorModal } from '../components/QRGeneratorModal';
+import { INITIAL_GUESTS } from '../services/mockData';
 
 export function Admin({ setActivePage }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
-  const [activeTab, setActiveTab] = useState('wedding_info'); // 'wedding_info' | 'google' | 'export' | 'security'
+  const [activeTab, setActiveTab] = useState('guests'); // default open 'guests' so user immediately sees how to input guests!
 
   // Wedding Settings State
   const [weddingForm, setWeddingForm] = useState(getWeddingSettings());
@@ -44,6 +57,22 @@ export function Admin({ setActivePage }) {
   // Google Integration State
   const [googleForm, setGoogleForm] = useState(getGoogleSettings());
   const [googleSaveSuccess, setGoogleSaveSuccess] = useState(false);
+
+  // Guest Management State
+  const [guestList, setGuestList] = useState([]);
+  const [guestSearch, setGuestSearch] = useState('');
+  const [newGuestName, setNewGuestName] = useState('');
+  const [newGuestCategory, setNewGuestCategory] = useState('Tamu Undangan');
+  const [newGuestPax, setNewGuestPax] = useState(1);
+  const [newGuestTable, setNewGuestTable] = useState('Meja Reguler');
+  const [guestSuccessMsg, setGuestSuccessMsg] = useState('');
+
+  // Bulk Import State
+  const [bulkText, setBulkText] = useState('');
+  const [bulkSuccessMsg, setBulkSuccessMsg] = useState('');
+
+  // QR Modal for viewing/downloading individual guest pass
+  const [selectedGuestQr, setSelectedGuestQr] = useState(null);
 
   // Stats & Logs
   const [stats, setStats] = useState({ checkins: 0, wishes: 0, moments: 0 });
@@ -56,13 +85,16 @@ export function Admin({ setActivePage }) {
   }, [isAuthenticated]);
 
   const loadData = async () => {
-    const [c, w, m] = await Promise.all([
+    const [c, w, m, g] = await Promise.all([
       getAllCheckins(),
       getAllWishes(),
       getAllMoments(),
+      getAllGuests(),
     ]);
+
     setStats({ checkins: c.length, wishes: w.length, moments: m.length });
     setAuditLogs(getSyncLogs());
+    setGuestList(g && g.length > 0 ? g : INITIAL_GUESTS);
   };
 
   const handleLogin = (e) => {
@@ -74,6 +106,48 @@ export function Admin({ setActivePage }) {
       setPinError(false);
     } else {
       setPinError(true);
+    }
+  };
+
+  // 1. Add Single Guest
+  const handleAddGuest = async (e) => {
+    e.preventDefault();
+    if (!newGuestName.trim()) return;
+
+    const created = await addGuest({
+      name: newGuestName,
+      category: newGuestCategory,
+      pax: newGuestPax,
+      table: newGuestTable,
+    });
+
+    setGuestSuccessMsg(`Tamu "${created.name}" berhasil ditambahkan dengan Token: ${created.qrToken}`);
+    setNewGuestName('');
+    setNewGuestPax(1);
+    setNewGuestTable('Meja Reguler');
+    await loadData();
+
+    setTimeout(() => setGuestSuccessMsg(''), 4000);
+  };
+
+  // 2. Bulk Import Guests
+  const handleBulkImport = async (e) => {
+    e.preventDefault();
+    if (!bulkText.trim()) return;
+
+    const imported = await importGuestsFromText(bulkText);
+    setBulkSuccessMsg(`Berhasil mengimpor ${imported.length} tamu sekaligus beserta Barcode/QR masing-masing!`);
+    setBulkText('');
+    await loadData();
+
+    setTimeout(() => setBulkSuccessMsg(''), 5000);
+  };
+
+  // 3. Delete Guest
+  const handleDeleteGuest = async (id, name) => {
+    if (window.confirm(`Hapus tamu "${name}" dari daftar undangan?`)) {
+      await deleteGuest(id);
+      await loadData();
     }
   };
 
@@ -101,6 +175,13 @@ export function Admin({ setActivePage }) {
     const wishes = await getAllWishes();
     exportWishesToCSV(wishes);
   };
+
+  const filteredGuests = guestList.filter((g) =>
+    g.name.toLowerCase().includes(guestSearch.toLowerCase()) ||
+    (g.category && g.category.toLowerCase().includes(guestSearch.toLowerCase())) ||
+    (g.table && g.table.toLowerCase().includes(guestSearch.toLowerCase())) ||
+    (g.qrToken && g.qrToken.toLowerCase().includes(guestSearch.toLowerCase()))
+  );
 
   // Hidden PIN Lock Screen
   if (!isAuthenticated) {
@@ -153,16 +234,16 @@ export function Admin({ setActivePage }) {
   return (
     <div className="space-y-6 pb-24 animate-fade-in max-w-4xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <span className="text-[10px] font-bold text-gold-400 uppercase tracking-widest bg-gold-500/10 px-2.5 py-1 rounded-full border border-gold-500/20 inline-block mb-1">
             Master Controller
           </span>
           <h2 className="font-serif text-2xl sm:text-3xl font-bold text-gold-gradient">
-            Pengaturan Acara Pernikahan
+            Panel Admin Pernikahan
           </h2>
           <p className="text-xs text-slate-300">
-            Kelola identitas kedua mempelai, tanggal acara, integrasi Google, dan keamanan.
+            Kelola daftar tamu & barcode, informasi mempelai, integrasi Google, dan keamanan.
           </p>
         </div>
 
@@ -185,6 +266,17 @@ export function Admin({ setActivePage }) {
 
       {/* Tabs Selector */}
       <div className="flex items-center gap-1.5 p-1 bg-navy-900 border border-gold-500/30 rounded-2xl overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('guests')}
+          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition ${
+            activeTab === 'guests'
+              ? 'bg-gradient-to-r from-gold-600 to-gold-500 text-navy-950 shadow-gold-glow font-bold'
+              : 'text-slate-300 hover:text-white'
+          }`}
+        >
+          <Users className="w-3.5 h-3.5" />
+          <span>Kelola Tamu & Barcode ({guestList.length})</span>
+        </button>
         <button
           onClick={() => setActiveTab('wedding_info')}
           className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition ${
@@ -231,7 +323,248 @@ export function Admin({ setActivePage }) {
         </button>
       </div>
 
-      {/* TAB 1: NAMA PENGANTIN & WAKTU ACARA */}
+      {/* TAB 1: KELOLA TAMU & BARCODE (GUEST & BARCODE MANAGER) */}
+      {activeTab === 'guests' && (
+        <div className="space-y-6">
+          {/* Summary Stats */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="glass-navy p-3.5 rounded-2xl text-center border border-white/10">
+              <span className="text-[11px] text-slate-400">Total Tamu Terdaftar</span>
+              <p className="text-xl font-bold font-mono text-slate-100">{guestList.length}</p>
+            </div>
+            <div className="glass-navy p-3.5 rounded-2xl text-center border border-emerald-500/30 bg-emerald-950/20">
+              <span className="text-[11px] text-emerald-400">Sudah Hadir</span>
+              <p className="text-xl font-bold font-mono text-emerald-400">
+                {guestList.filter((g) => g.checkedIn).length}
+              </p>
+            </div>
+            <div className="glass-navy p-3.5 rounded-2xl text-center border border-amber-500/30 bg-amber-950/20">
+              <span className="text-[11px] text-amber-300">Belum Hadir</span>
+              <p className="text-xl font-bold font-mono text-amber-300">
+                {guestList.filter((g) => !g.checkedIn).length}
+              </p>
+            </div>
+          </div>
+
+          {/* Form 1: Tambah Tamu Satuan */}
+          <div className="glass-navy p-5 sm:p-6 rounded-3xl border border-gold-500/30 shadow-navy-card space-y-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-white/10">
+              <UserPlus className="w-5 h-5 text-gold-400" />
+              <div>
+                <h3 className="font-serif font-bold text-base sm:text-lg text-slate-100">
+                  Tambah Tamu Undangan Baru
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  Sistem akan otomatis membuatkan Barcode & QR Code unik untuk tamu ini.
+                </p>
+              </div>
+            </div>
+
+            {guestSuccessMsg && (
+              <div className="p-3 bg-emerald-950/80 border border-emerald-500/50 rounded-xl text-xs text-emerald-300 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{guestSuccessMsg}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleAddGuest} className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Nama Tamu / Keluarga
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newGuestName}
+                  onChange={(e) => setNewGuestName(e.target.value)}
+                  placeholder="Contoh: Bpk. Bambang & Istri"
+                  className="w-full bg-navy-950 border border-gold-500/20 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:border-gold-400 transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Kategori Tamu
+                </label>
+                <select
+                  value={newGuestCategory}
+                  onChange={(e) => setNewGuestCategory(e.target.value)}
+                  className="w-full bg-navy-950 border border-gold-500/20 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:border-gold-400 transition"
+                >
+                  <option value="VIP / Kehormatan">VIP / Kehormatan</option>
+                  <option value="Keluarga Mempelai Pria">Keluarga Pria</option>
+                  <option value="Keluarga Mempelai Wanita">Keluarga Wanita</option>
+                  <option value="Teman Kerja / Rekan Kantor">Teman Kerja</option>
+                  <option value="Sahabat / Groomsmen / Bridesmaid">Sahabat</option>
+                  <option value="Tamu Undangan">Tamu Reguler</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Jumlah Orang (Pax)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={newGuestPax}
+                  onChange={(e) => setNewGuestPax(e.target.value)}
+                  className="w-full bg-navy-950 border border-gold-500/20 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:border-gold-400 transition"
+                />
+              </div>
+
+              <div className="sm:col-span-3">
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Nomor / Nama Meja
+                </label>
+                <input
+                  type="text"
+                  value={newGuestTable}
+                  onChange={(e) => setNewGuestTable(e.target.value)}
+                  placeholder="Contoh: Meja VIP 02"
+                  className="w-full bg-navy-950 border border-gold-500/20 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:border-gold-400 transition"
+                />
+              </div>
+
+              <div className="flex items-end">
+                <button
+                  type="submit"
+                  className="w-full py-2.5 bg-gradient-to-r from-gold-600 to-gold-500 hover:from-gold-500 hover:to-gold-400 text-navy-950 font-bold text-xs rounded-xl transition shadow-gold-glow flex items-center justify-center gap-1.5"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>+ Simpan & Buat QR</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Form 2: Import Massal (Bulk Import) dari Excel */}
+          <div className="glass-navy p-5 sm:p-6 rounded-3xl border border-white/10 shadow-navy-card space-y-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-white/10">
+              <FileText className="w-5 h-5 text-gold-400" />
+              <div>
+                <h3 className="font-serif font-bold text-base sm:text-lg text-slate-100">
+                  Import Massal dari Excel / Teks (Bisa Puluhan/Ratusan Sekaligus)
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  Cukup salin (copy) baris nama dari Excel lalu tempel (paste) di bawah.
+                </p>
+              </div>
+            </div>
+
+            {bulkSuccessMsg && (
+              <div className="p-3 bg-emerald-950/80 border border-emerald-500/50 rounded-xl text-xs text-emerald-300 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{bulkSuccessMsg}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleBulkImport} className="space-y-3">
+              <textarea
+                rows={4}
+                value={bulkText}
+                onChange={(e) => setBulkText(e.target.value)}
+                placeholder={`Format baris: Nama Tamu, Kategori, Pax, Meja\n\nContoh:\nBpk. Bambang & Istri, VIP, 2, Meja VIP 01\ndr. Sarah Amanda, Bridesmaid, 2, Meja 04\nRian Pratama, Rekan Kantor, 1, Meja 07`}
+                className="w-full bg-navy-950 border border-gold-500/20 rounded-xl p-3 text-xs text-slate-100 font-mono placeholder-slate-600 focus:outline-none focus:border-gold-400 transition"
+              />
+
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-slate-400">
+                  *Setiap baris otomatis dibuatkan Token QR Code unik secara instan.
+                </span>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-navy-800 hover:bg-navy-700 text-gold-300 border border-gold-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+                >
+                  <Sparkles className="w-4 h-4 text-gold-400" />
+                  <span>Import Semua Tamu Sekarang</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* List Tamu & Barcode Pass */}
+          <div className="glass-navy p-5 rounded-3xl border border-white/10 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h4 className="font-serif font-bold text-slate-100 text-base">
+                  Daftar Tamu & Barcode Tiket ({filteredGuests.length})
+                </h4>
+                <p className="text-[11px] text-slate-400">
+                  Klik tombol QR untuk melihat/mengunduh gambar QR Code pass masing-masing tamu.
+                </p>
+              </div>
+
+              <div className="relative">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={guestSearch}
+                  onChange={(e) => setGuestSearch(e.target.value)}
+                  placeholder="Cari nama / meja / token..."
+                  className="bg-navy-950 border border-white/10 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-gold-400 transition"
+                />
+              </div>
+            </div>
+
+            <div className="divide-y divide-white/5 max-h-96 overflow-y-auto pr-1">
+              {filteredGuests.map((guest) => (
+                <div key={guest.id} className="py-3 flex items-center justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-xs sm:text-sm text-slate-100">
+                        {guest.name}
+                      </span>
+                      {guest.checkedIn && (
+                        <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-semibold border border-emerald-500/30">
+                          Hadir
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
+                      <span className="text-gold-400 font-medium">{guest.category}</span>
+                      <span>•</span>
+                      <span>{guest.table}</span>
+                      <span>•</span>
+                      <span>{guest.pax} Orang</span>
+                      <span>•</span>
+                      <span className="font-mono text-[10px] text-slate-500">{guest.qrToken}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={() =>
+                        setSelectedGuestQr({
+                          value: guest.qrToken,
+                          title: guest.name,
+                          subtitle: `${guest.category} • ${guest.table} (${guest.pax} Pax)`,
+                        })
+                      }
+                      title="Lihat / Unduh QR Code Tamu"
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-gold-500/20 hover:bg-gold-500/30 text-gold-300 border border-gold-500/30 text-xs font-semibold transition"
+                    >
+                      <QrCode className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">QR Code</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleDeleteGuest(guest.id, guest.name)}
+                      title="Hapus Tamu"
+                      className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: NAMA PENGANTIN & WAKTU ACARA */}
       {activeTab === 'wedding_info' && (
         <form onSubmit={handleSaveWeddingSettings} className="glass-navy p-5 sm:p-6 rounded-3xl border border-gold-500/30 shadow-navy-card space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-white/10">
@@ -363,7 +696,7 @@ export function Admin({ setActivePage }) {
         </form>
       )}
 
-      {/* TAB 2: INTEGRASI GOOGLE SHEETS & DRIVE */}
+      {/* TAB 3: INTEGRASI GOOGLE SHEETS & DRIVE */}
       {activeTab === 'google' && (
         <form onSubmit={handleSaveGoogleSettings} className="glass-navy p-5 sm:p-6 rounded-3xl border border-gold-500/30 shadow-navy-card space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-white/10">
@@ -385,26 +718,13 @@ export function Admin({ setActivePage }) {
           <div className="space-y-3">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Google Apps Script Webhook URL (Untuk Auto Sheets)
+                Google Apps Script Webhook URL (Untuk Auto Sheets & Drive)
               </label>
               <input
                 type="url"
                 value={googleForm.sheetsWebhookUrl}
                 onChange={(e) => setGoogleForm({ ...googleForm, sheetsWebhookUrl: e.target.value })}
                 placeholder="https://script.google.com/macros/s/.../exec"
-                className="w-full bg-navy-950 border border-gold-500/20 rounded-xl p-2.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-gold-400 transition"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Google Drive Backup Folder ID
-              </label>
-              <input
-                type="text"
-                value={googleForm.driveFolderId}
-                onChange={(e) => setGoogleForm({ ...googleForm, driveFolderId: e.target.value })}
-                placeholder="FOLDER_HEMA_WEDDING_MOMENTS"
                 className="w-full bg-navy-950 border border-gold-500/20 rounded-xl p-2.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-gold-400 transition"
               />
             </div>
@@ -419,7 +739,7 @@ export function Admin({ setActivePage }) {
         </form>
       )}
 
-      {/* TAB 3: EKSPOR DATA CSV */}
+      {/* TAB 4: EKSPOR DATA CSV */}
       {activeTab === 'export' && (
         <div className="glass-navy p-5 sm:p-6 rounded-3xl border border-gold-500/30 shadow-navy-card space-y-4">
           <div className="flex items-center gap-2 pb-3 border-b border-white/10">
@@ -467,7 +787,7 @@ export function Admin({ setActivePage }) {
         </div>
       )}
 
-      {/* TAB 4: KEAMANAN & PIN TERPISAH */}
+      {/* TAB 5: KEAMANAN & PIN */}
       {activeTab === 'security' && (
         <form onSubmit={handleSaveWeddingSettings} className="glass-navy p-5 sm:p-6 rounded-3xl border border-gold-500/30 shadow-navy-card space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-white/10">
@@ -525,6 +845,17 @@ export function Admin({ setActivePage }) {
             Simpan PIN Keamanan Baru
           </button>
         </form>
+      )}
+
+      {/* MODAL QR CODE TAMU */}
+      {selectedGuestQr && (
+        <QRGeneratorModal
+          isOpen={!!selectedGuestQr}
+          onClose={() => setSelectedGuestQr(null)}
+          value={selectedGuestQr.value}
+          title={selectedGuestQr.title}
+          subtitle={selectedGuestQr.subtitle}
+        />
       )}
     </div>
   );

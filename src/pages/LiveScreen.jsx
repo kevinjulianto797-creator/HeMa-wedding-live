@@ -156,33 +156,55 @@ export function LiveScreen({ setActivePage }) {
         />
 
         {/* Center Frame */}
-        <div className="relative max-h-[72vh] max-w-5xl w-full flex items-center justify-center">
-          <img
-            key={currentPhoto.previewUrl}
-            src={currentPhoto.previewUrl}
-            alt={currentPhoto.caption}
-            className="max-h-[68vh] max-w-full object-contain rounded-3xl shadow-2xl border-2 border-gold-500/40 animate-fade-in transition-all duration-700"
-          />
+        {moments.length > 0 && currentPhoto ? (
+          <div className="relative max-h-[72vh] max-w-5xl w-full flex items-center justify-center">
+            <img
+              key={currentPhoto.previewUrl}
+              src={currentPhoto.previewUrl}
+              alt={currentPhoto.caption}
+              className="max-h-[68vh] max-w-full object-contain rounded-3xl shadow-2xl border-2 border-gold-500/40 animate-fade-in transition-all duration-700"
+            />
 
-          {/* Photo Caption Badge */}
-          <div className="absolute bottom-4 left-6 right-6 flex items-center justify-between pointer-events-none">
-            <div className="glass-navy px-4 py-2.5 rounded-2xl border border-gold-500/30 max-w-xl backdrop-blur-md">
-              <span className="text-[10px] font-bold text-gold-400 uppercase tracking-widest block mb-0.5">
-                {currentPhoto.category || 'Momen Bahagia'} • {currentPhoto.uploaderName}
-              </span>
-              <p className="text-xs sm:text-sm font-semibold text-slate-100 line-clamp-1">
-                {currentPhoto.caption}
-              </p>
+            {/* Photo Caption Badge */}
+            <div className="absolute bottom-4 left-6 right-6 flex items-center justify-between pointer-events-none">
+              <div className="glass-navy px-4 py-2.5 rounded-2xl border border-gold-500/30 max-w-xl backdrop-blur-md">
+                <span className="text-[10px] font-bold text-gold-400 uppercase tracking-widest block mb-0.5">
+                  {currentPhoto.category || 'Momen Bahagia'} • {currentPhoto.uploaderName}
+                </span>
+                <p className="text-xs sm:text-sm font-semibold text-slate-100 line-clamp-1">
+                  {currentPhoto.caption}
+                </p>
+              </div>
+
+              {/* Slide Index Indicator */}
+              {moments.length > 1 && (
+                <div className="glass-navy px-3 py-1.5 rounded-xl border border-white/10 text-xs font-mono text-gold-300">
+                  {currentSlideIndex + 1} / {moments.length}
+                </div>
+              )}
             </div>
-
-            {/* Slide Index Indicator */}
-            {moments.length > 1 && (
-              <div className="glass-navy px-3 py-1.5 rounded-xl border border-white/10 text-xs font-mono text-gold-300">
-                {currentSlideIndex + 1} / {moments.length}
+          </div>
+        ) : (
+          <div className="text-center p-8 sm:p-12 glass-navy rounded-3xl border-2 border-gold-500/40 shadow-2xl max-w-md space-y-4 animate-fade-in">
+            <div className="w-16 h-16 mx-auto rounded-full bg-gold-500/10 border-2 border-gold-400 flex items-center justify-center text-gold-400 shadow-gold-glow">
+              <Sparkles className="w-8 h-8" />
+            </div>
+            <h2 className="font-serif text-3xl sm:text-4xl font-bold text-gold-gradient">
+              {settings.coupleTitle || 'Hendra & Maya'}
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-300">
+              Layar proyektor live panggung. Foto dari fotografer dan selfie tamu akan langsung tayang di sini secara realtime.
+            </p>
+            {qrVenueUrl && (
+              <div className="pt-2 inline-block">
+                <img src={qrVenueUrl} alt="Scan QR" className="w-32 h-32 mx-auto rounded-2xl bg-white p-1.5 shadow-lg border border-gold-400/40" />
+                <p className="text-[10px] font-bold text-gold-400 uppercase tracking-widest mt-2">
+                  Scan untuk Kirim Doa & Foto
+                </p>
               </div>
             )}
           </div>
-        </div>
+        )}
 
         {/* Scan Me QR Overlay on Stage Screen (Corner) */}
         {qrVenueUrl && (
