@@ -7,14 +7,15 @@ import {
   Users, 
   Heart, 
   Clock, 
-  Volume2,
   ChevronLeft,
   ChevronRight,
   ArrowLeft
 } from 'lucide-react';
 import { getAllMoments, getAllWishes, getAllCheckins } from '../services/db';
+import { getWeddingSettings } from '../services/weddingSettings';
 
 export function LiveScreen({ setActivePage }) {
+  const [settings, setSettings] = useState(getWeddingSettings());
   const [moments, setMoments] = useState([]);
   const [wishes, setWishes] = useState([]);
   const [checkinsCount, setCheckinsCount] = useState(142);
@@ -25,6 +26,12 @@ export function LiveScreen({ setActivePage }) {
 
   // Generate QR for Guests to scan while looking at stage screen
   useEffect(() => {
+    const handleSettingsUpdate = (e) => {
+      setSettings(e.detail || getWeddingSettings());
+    };
+
+    window.addEventListener('wedding-settings-updated', handleSettingsUpdate);
+
     const venueLink = window.location.origin || 'https://hema-wedding.live';
     QRCode.toDataURL(venueLink, {
       width: 180,
@@ -36,7 +43,10 @@ export function LiveScreen({ setActivePage }) {
       setCurrentTime(new Date().toLocaleTimeString('id-ID'));
     }, 1000);
 
-    return () => clearInterval(clockTimer);
+    return () => {
+      window.removeEventListener('wedding-settings-updated', handleSettingsUpdate);
+      clearInterval(clockTimer);
+    };
   }, []);
 
   // Fetch data & auto-sync
@@ -90,7 +100,7 @@ export function LiveScreen({ setActivePage }) {
 
   const currentPhoto = moments[currentSlideIndex] || {
     previewUrl: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1600&q=85',
-    caption: 'The Wedding Celebration of Hendra & Maya',
+    caption: `The Wedding Celebration of ${settings.coupleTitle || 'Hendra & Maya'}`,
     uploaderName: 'Official Lens Art',
     category: 'Akad Nikah',
   };
@@ -111,10 +121,10 @@ export function LiveScreen({ setActivePage }) {
 
           <div>
             <h1 className="font-serif text-xl sm:text-2xl font-bold text-gold-gradient">
-              Hendra & Maya
+              {settings.coupleTitle || 'Hendra & Maya'}
             </h1>
             <p className="text-[11px] text-slate-300 font-medium tracking-wider uppercase">
-              Grand Ballroom Hotel Mulia • {currentTime} WIB
+              {settings.venueName || 'Grand Ballroom Hotel Mulia'} • {currentTime} WIB
             </p>
           </div>
         </div>

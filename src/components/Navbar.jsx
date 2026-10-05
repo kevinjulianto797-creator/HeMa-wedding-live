@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Wifi, WifiOff, RefreshCw, Sparkles, Tv, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { RefreshCw, Tv } from 'lucide-react';
 import { syncService } from '../services/syncService';
+import { getWeddingSettings } from '../services/weddingSettings';
 
 export function Navbar({ activePage, setActivePage }) {
   const [networkStatus, setNetworkStatus] = useState({
@@ -8,8 +9,19 @@ export function Navbar({ activePage, setActivePage }) {
     isSyncing: false,
   });
   const [pendingCount, setPendingCount] = useState(0);
+  const [settings, setSettings] = useState(getWeddingSettings());
+
+  // Secret Admin Tap Counter (5 taps within 3 seconds)
+  const tapCountRef = useRef(0);
+  const tapTimerRef = useRef(null);
 
   useEffect(() => {
+    const handleSettingsUpdate = (e) => {
+      setSettings(e.detail || getWeddingSettings());
+    };
+
+    window.addEventListener('wedding-settings-updated', handleSettingsUpdate);
+
     const updateCounts = async () => {
       const counts = await syncService.getPendingCount();
       setPendingCount(counts.total);
@@ -27,10 +39,10 @@ export function Navbar({ activePage, setActivePage }) {
     };
 
     window.addEventListener('wedding-sync-completed', handleSyncComplete);
-
     const interval = setInterval(updateCounts, 4000);
 
     return () => {
+      window.removeEventListener('wedding-settings-updated', handleSettingsUpdate);
       unsubscribe();
       window.removeEventListener('wedding-sync-completed', handleSyncComplete);
       clearInterval(interval);
@@ -41,57 +53,67 @@ export function Navbar({ activePage, setActivePage }) {
     syncService.syncAll();
   };
 
+  // Secret Easter Egg for Admin
+  const handleLogoTap = () => {
+    tapCountRef.current += 1;
+    if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
+
+    if (tapCountRef.current >= 5) {
+      tapCountRef.current = 0;
+      setActivePage('admin');
+      return;
+    }
+
+    tapTimerRef.current = setTimeout(() => {
+      tapCountRef.current = 0;
+    }, 2500);
+
+    // If single tap, navigate to home as usual
+    if (tapCountRef.current === 1) {
+      setActivePage('home');
+    }
+  };
+
   return (
     <header className="sticky top-0 z-40 w-full glass-navy border-b border-gold-500/20 backdrop-blur-md">
       <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center justify-between">
-        {/* Brand & Couple Names */}
+        {/* Brand & Couple Names (Secret Admin trigger on 5 taps) */}
         <div 
-          onClick={() => setActivePage('home')}
-          className="flex items-center gap-2.5 cursor-pointer group"
+          onClick={handleLogoTap}
+          className="flex items-center gap-2.5 cursor-pointer group select-none"
+          title="Klik untuk Beranda"
         >
           <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-gold-600 via-gold-400 to-amber-200 p-[1.5px] shadow-gold-glow">
             <div className="w-full h-full rounded-full bg-navy-900 flex items-center justify-center">
-              <span className="font-serif text-sm font-bold text-gold-400">HM</span>
+              <span className="font-serif text-sm font-bold text-gold-400">
+                {settings.initials || 'HM'}
+              </span>
             </div>
           </div>
           <div>
             <h1 className="font-serif text-base sm:text-lg font-bold tracking-wide text-gold-gradient group-hover:opacity-90 transition">
-              Hendra & Maya
+              {settings.coupleTitle || 'Hendra & Maya'}
             </h1>
             <p className="text-[10px] text-slate-300 font-medium tracking-wider uppercase">
-              Minggu, 18 Okt 2026 • Live
+              {settings.weddingDateFormatted || 'Minggu, 18 Okt 2026'} • Live
             </p>
           </div>
         </div>
 
-        {/* Right Status Actions */}
+        {/* Right Status Actions (Admin button removed - completely hidden!) */}
         <div className="flex items-center gap-2">
-          {/* TV Projector Quick Link */}
+          {/* TV Projector Link */}
           <button
             onClick={() => setActivePage('live')}
             title="Buka Mode Layar TV / Proyektor Gedung"
-            className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition ${
               activePage === 'live'
                 ? 'bg-gold-500 text-navy-950 border-gold-400 font-semibold'
                 : 'bg-navy-800/80 text-gold-300 border-gold-500/30 hover:bg-navy-700'
             }`}
           >
             <Tv className="w-3.5 h-3.5" />
-            <span>Layar Proyektor</span>
-          </button>
-
-          {/* Admin / Fotografer Quick Link */}
-          <button
-            onClick={() => setActivePage('admin')}
-            title="Panel Admin & Fotografer"
-            className={`p-1.5 sm:px-2.5 sm:py-1 rounded-full text-xs font-medium border transition flex items-center gap-1.5 ${
-              activePage === 'admin'
-                ? 'bg-gold-500 text-navy-950 border-gold-400 font-semibold'
-                : 'bg-navy-800/80 text-slate-200 border-white/10 hover:bg-navy-700'
-            }`}
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-gold-400" />
-            <span className="hidden md:inline">Admin / Fotografer</span>
+            <span className="hidden sm:inline">Layar Proyektor</span>
           </button>
 
           {/* Pending Sync / Offline Indicator */}
@@ -121,7 +143,7 @@ export function Navbar({ activePage, setActivePage }) {
               }`}
             />
             <span className="hidden sm:inline">
-              {networkStatus.isOnline ? 'Online' : 'Offline (Auto-Sync)'}
+              {networkStatus.isOnline ? 'Online' : 'Offline'}
             </span>
           </div>
         </div>

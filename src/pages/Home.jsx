@@ -13,8 +13,10 @@ import {
   Tv
 } from 'lucide-react';
 import { getAllCheckins, getAllWishes, getAllMoments } from '../services/db';
+import { getWeddingSettings } from '../services/weddingSettings';
 
 export function Home({ setActivePage }) {
+  const [settings, setSettings] = useState(getWeddingSettings());
   const [stats, setStats] = useState({
     checkedInCount: 142,
     momentsCount: 5,
@@ -22,9 +24,14 @@ export function Home({ setActivePage }) {
   });
 
   const [recentMoments, setRecentMoments] = useState([]);
-  const [recentWishes, setRecentWishes] = useState([]);
 
   useEffect(() => {
+    const handleSettingsUpdate = (e) => {
+      setSettings(e.detail || getWeddingSettings());
+    };
+
+    window.addEventListener('wedding-settings-updated', handleSettingsUpdate);
+
     const loadData = async () => {
       try {
         const [checkins, wishes, moments] = await Promise.all([
@@ -40,7 +47,6 @@ export function Home({ setActivePage }) {
         });
 
         setRecentMoments(moments.slice(0, 3));
-        setRecentWishes(wishes.slice(0, 2));
       } catch (err) {
         console.error('Error loading home data:', err);
       }
@@ -48,7 +54,11 @@ export function Home({ setActivePage }) {
 
     loadData();
     window.addEventListener('wedding-sync-completed', loadData);
-    return () => window.removeEventListener('wedding-sync-completed', loadData);
+
+    return () => {
+      window.removeEventListener('wedding-settings-updated', handleSettingsUpdate);
+      window.removeEventListener('wedding-sync-completed', loadData);
+    };
   }, []);
 
   return (
@@ -66,22 +76,23 @@ export function Home({ setActivePage }) {
           </div>
 
           <h2 className="font-serif text-3xl sm:text-5xl font-bold text-gold-gradient tracking-tight leading-tight">
-            Hendra & Maya
+            {settings.coupleTitle || 'Hendra & Maya'}
           </h2>
 
           <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
-            Selamat datang di Buku Tamu Digital & Live Momen Pernikahan kami. Kehadiran dan doa restu Anda adalah anugerah terindah bagi kami.
+            {settings.welcomeMessage ||
+              'Selamat datang di Buku Tamu Digital & Live Momen Pernikahan kami. Kehadiran dan doa restu Anda adalah anugerah terindah bagi kami.'}
           </p>
 
           {/* Event Details Pill */}
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2 text-xs text-slate-300">
             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-navy-900/80 rounded-xl border border-white/10">
               <Clock className="w-4 h-4 text-gold-400" />
-              <span>Minggu, 18 Oktober 2026</span>
+              <span>{settings.weddingDateFormatted || 'Minggu, 18 Oktober 2026'}</span>
             </div>
             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-navy-900/80 rounded-xl border border-white/10">
               <MapPin className="w-4 h-4 text-gold-400" />
-              <span>Grand Ballroom Hotel Mulia</span>
+              <span>{settings.venueName || 'Grand Ballroom Hotel Mulia'}</span>
             </div>
           </div>
         </div>

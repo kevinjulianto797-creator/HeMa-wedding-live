@@ -6,19 +6,20 @@ import { CheckIn } from './pages/CheckIn';
 import { Moments } from './pages/Moments';
 import { Wishes } from './pages/Wishes';
 import { Admin } from './pages/Admin';
+import { Photographer } from './pages/Photographer';
 import { LiveScreen } from './pages/LiveScreen';
 import { syncService } from './services/syncService';
-import { WifiOff, RefreshCw } from 'lucide-react';
+import { WifiOff } from 'lucide-react';
 
 export function App() {
   const [activePage, setActivePage] = useState('home');
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
-  // Sync with URL hash if provided (e.g. #live, #checkin)
+  // Sync with URL hash (e.g. #live, #checkin, #admin, #photographer)
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '');
-      if (['home', 'checkin', 'moments', 'wishes', 'admin', 'live'].includes(hash)) {
+      if (['home', 'checkin', 'moments', 'wishes', 'admin', 'photographer', 'live'].includes(hash)) {
         setActivePage(hash);
       }
     };
@@ -76,10 +77,11 @@ export function App() {
         {activePage === 'checkin' && <CheckIn />}
         {activePage === 'moments' && <Moments />}
         {activePage === 'wishes' && <Wishes />}
-        {activePage === 'admin' && <Admin />}
+        {activePage === 'admin' && <Admin setActivePage={handlePageChange} />}
+        {activePage === 'photographer' && <Photographer setActivePage={handlePageChange} />}
       </main>
 
-      {/* Mobile Bottom Navigation */}
+      {/* Mobile Bottom Navigation (Clean guest-facing tabs) */}
       <BottomNav activePage={activePage} setActivePage={handlePageChange} />
     </div>
   );
