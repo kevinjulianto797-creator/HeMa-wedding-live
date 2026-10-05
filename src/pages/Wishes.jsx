@@ -16,8 +16,10 @@ import { AudioPlayer } from '../components/AudioPlayer';
 import { INITIAL_WISHES } from '../services/mockData';
 import { getAllWishes, saveWish } from '../services/db';
 import { syncService } from '../services/syncService';
+import { getWeddingSettings } from '../services/weddingSettings';
 
 export function Wishes() {
+  const [weddingSettings] = useState(getWeddingSettings());
   const [wishes, setWishes] = useState(INITIAL_WISHES);
   const [activeFormTab, setActiveFormTab] = useState('text'); // 'text' | 'voice'
   const [senderName, setSenderName] = useState('');
@@ -245,7 +247,7 @@ export function Wishes() {
                 rows={3}
                 value={messageText}
                 onChange={(e) => setMessageText(e.target.value)}
-                placeholder="Tuliskan doa terbaik untuk pernikahan Hendra & Maya..."
+                placeholder={`Tuliskan doa terbaik untuk pernikahan ${weddingSettings.coupleTitle || 'kedua mempelai'}...`}
                 className="w-full bg-navy-950 border border-gold-500/20 rounded-xl p-3 text-xs sm:text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-gold-400 transition"
               />
             </div>

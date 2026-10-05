@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, Square, Play, Pause, Trash2, Send, AlertCircle } from 'lucide-react';
+import { getWeddingSettings } from '../services/weddingSettings';
 
 export function VoiceRecorder({ onRecordingComplete, onCancel }) {
+  const [settings] = useState(getWeddingSettings());
   const [recordingStatus, setRecordingStatus] = useState('idle'); // 'idle' | 'recording' | 'preview'
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [isPlayingPreview, setIsPlayingPreview] = useState(false);
@@ -150,7 +152,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel }) {
       {recordingStatus === 'idle' && (
         <div className="text-center py-6">
           <p className="text-xs text-slate-400 mb-5">
-            Ucapkan doa dan selamat langsung dengan rekaman suara Anda untuk Hendra & Maya.
+            Ucapkan doa dan selamat langsung dengan rekaman suara Anda untuk {settings.coupleTitle || 'kedua mempelai'}.
           </p>
           <button
             onClick={startRecording}

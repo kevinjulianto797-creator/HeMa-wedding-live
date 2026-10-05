@@ -16,8 +16,10 @@ import {
 import { INITIAL_MOMENTS } from '../services/mockData';
 import { getAllMoments, saveMoment, updateMomentLikes } from '../services/db';
 import { syncService } from '../services/syncService';
+import { getWeddingSettings } from '../services/weddingSettings';
 
 export function Moments() {
+  const [weddingSettings] = useState(getWeddingSettings());
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'photographer' | 'guest'
   const [selectedCategory, setSelectedCategory] = useState('Semua');
   const [moments, setMoments] = useState(INITIAL_MOMENTS);
@@ -116,7 +118,7 @@ export function Moments() {
 
     try {
       const newMoment = {
-        caption: caption || 'Momen Bahagia Bersama Hendra & Maya',
+        caption: caption || `Momen Bahagia Bersama ${weddingSettings.coupleTitle || 'Mempelai'}`,
         uploaderName: uploaderName.trim() || 'Tamu Undangan',
         uploaderRole: 'guest',
         type: previewMedia.type,

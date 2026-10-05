@@ -26,11 +26,16 @@ import {
   Upload,
   ExternalLink,
   HelpCircle,
-  FileUp
+  FileUp,
+  MessageCircle,
+  Copy,
+  Check
 } from 'lucide-react';
 import { 
   getWeddingSettings, 
-  saveWeddingSettings 
+  saveWeddingSettings,
+  getShareableWeddingUrl,
+  getWhatsAppShareText
 } from '../services/weddingSettings';
 import { 
   getGoogleSettings, 
@@ -181,6 +186,21 @@ export function Admin({ setActivePage }) {
       await deleteGuest(id);
       await loadData();
     }
+  };
+
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const handleCopyShareLink = () => {
+    const url = getShareableWeddingUrl(weddingForm);
+    navigator.clipboard.writeText(url);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2500);
+  };
+
+  const handleOpenWhatsAppShare = () => {
+    const text = getWhatsAppShareText(weddingForm);
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(waUrl, '_blank');
   };
 
   const handleSaveWeddingSettings = (e) => {
@@ -659,7 +679,8 @@ export function Admin({ setActivePage }) {
 
       {/* TAB 2: NAMA PENGANTIN & WAKTU ACARA */}
       {activeTab === 'wedding_info' && (
-        <form onSubmit={handleSaveWeddingSettings} className="glass-navy p-5 sm:p-6 rounded-3xl border border-gold-500/30 shadow-navy-card space-y-4">
+        <div className="space-y-6">
+          <form onSubmit={handleSaveWeddingSettings} className="glass-navy p-5 sm:p-6 rounded-3xl border border-gold-500/30 shadow-navy-card space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-white/10">
             <h3 className="font-serif font-bold text-lg text-slate-100">
               Informasi Mempelai & Acara
@@ -682,7 +703,7 @@ export function Admin({ setActivePage }) {
                 required
                 value={weddingForm.groomName}
                 onChange={(e) => setWeddingForm({ ...weddingForm, groomName: e.target.value })}
-                placeholder="Contoh: Hendra"
+                placeholder="Contoh: Cecep"
                 className="w-full bg-navy-950 border border-gold-500/20 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:border-gold-400 transition"
               />
             </div>
@@ -696,7 +717,7 @@ export function Admin({ setActivePage }) {
                 required
                 value={weddingForm.brideName}
                 onChange={(e) => setWeddingForm({ ...weddingForm, brideName: e.target.value })}
-                placeholder="Contoh: Maya"
+                placeholder="Contoh: Memey"
                 className="w-full bg-navy-950 border border-gold-500/20 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:border-gold-400 transition"
               />
             </div>
@@ -710,7 +731,7 @@ export function Admin({ setActivePage }) {
                 maxLength={4}
                 value={weddingForm.initials}
                 onChange={(e) => setWeddingForm({ ...weddingForm, initials: e.target.value })}
-                placeholder="Contoh: HM"
+                placeholder="Contoh: CM"
                 className="w-full bg-navy-950 border border-gold-500/20 rounded-xl p-2.5 text-xs text-slate-100 font-serif focus:outline-none focus:border-gold-400 transition"
               />
             </div>
@@ -787,7 +808,59 @@ export function Admin({ setActivePage }) {
             Simpan Perubahan Informasi Acara
           </button>
         </form>
-      )}
+
+        {/* CARD: BAGIKAN KE WHATSAPP & SOSIAL MEDIA */}
+        <div className="glass-navy p-5 sm:p-6 rounded-3xl border border-emerald-500/30 shadow-navy-card space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-white/10">
+            <div className="flex items-center gap-2">
+              <MessageCircle className="w-5 h-5 text-emerald-400" />
+              <h3 className="font-serif font-bold text-lg text-slate-100">
+                Bagikan Tautan ke WhatsApp & Sosial Media
+              </h3>
+            </div>
+            <span className="text-[11px] px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-medium">
+              Nama Mempelai Otomatis
+            </span>
+          </div>
+
+          <p className="text-xs text-slate-300 leading-relaxed">
+            Tautan di bawah ini otomatis menyematkan nama pengantin <strong>{weddingForm.groomName || 'Cecep'} & {weddingForm.brideName || 'Memey'}</strong>. Saat dibagikan ke WhatsApp, nama mempelai, deskripsi undangan, dan kartu pratinjau mewah akan otomatis muncul!
+          </p>
+
+          <div className="p-3 bg-navy-950/80 rounded-xl border border-emerald-500/20 flex items-center justify-between gap-2 overflow-hidden">
+            <span className="text-xs font-mono text-emerald-300 truncate">
+              {getShareableWeddingUrl(weddingForm)}
+            </span>
+            <button
+              type="button"
+              onClick={handleCopyShareLink}
+              className="px-3 py-1.5 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 border border-emerald-500/40 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition shrink-0"
+            >
+              {linkCopied ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Tersalin!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Salin Link</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleOpenWhatsAppShare}
+            className="w-full py-3 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 hover:brightness-110 text-white font-bold text-xs rounded-xl transition shadow-lg flex items-center justify-center gap-2"
+          >
+            <MessageCircle className="w-4 h-4" />
+            <span>Kirim Undangan / Live Link via WhatsApp Sekarang</span>
+          </button>
+        </div>
+      </div>
+    )}
 
       {/* TAB 3: KONEKSI CLOUDFLARE (R2 & PAGES) */}
       {activeTab === 'cloudflare' && (
