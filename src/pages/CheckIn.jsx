@@ -19,7 +19,7 @@ import { QRGeneratorModal } from '../components/QRGeneratorModal';
 import { INITIAL_GUESTS } from '../services/mockData';
 import { saveCheckin, getAllCheckins, setAppState, getAppState } from '../services/db';
 import { syncService } from '../services/syncService';
-import { getAllGuests } from '../services/guestService';
+import { getAllGuests, addGuest } from '../services/guestService';
 
 export function CheckIn() {
   const [activeTab, setActiveTab] = useState('self'); // Default Mode 1: 'self' (Tamu Mandiri) | Mode 2: 'receptionist' (Panitia)
@@ -29,6 +29,11 @@ export function CheckIn() {
   const [qrModalData, setQrModalData] = useState(null); // for generating QR pass
   const [successGuest, setSuccessGuest] = useState(null);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+  // Modal & Form State untuk Tamu Baru Mandiri (yang belum ada di list Excel)
+  const [isSelfNewGuestOpen, setIsSelfNewGuestOpen] = useState(false);
+  const [selfNewName, setSelfNewName] = useState('');
+  const [selfNewPax, setSelfNewPax] = useState(1);
 
   // Load guests and checkins from IndexedDB / guestService
   useEffect(() => {
@@ -121,6 +126,31 @@ export function CheckIn() {
     // Trigger sync if online
     if (isOnline) {
       syncService.syncAll();
+    }
+  };
+
+  // Submit Self New Guest (jika nama belum terdaftar di Excel)
+  const handleSelfNewGuestSubmit = async (e) => {
+    e.preventDefault();
+    if (!selfNewName.trim()) return;
+
+    try {
+      const created = await addGuest({
+        name: selfNewName.trim(),
+        category: 'Tamu Undangan',
+        pax: selfNewPax || 1,
+        table: 'Meja Reguler',
+      });
+
+      const updatedList = [created, ...guests];
+      setGuests(updatedList);
+      setIsSelfNewGuestOpen(false);
+      setSelfNewName('');
+      setSelfNewPax(1);
+
+      await handleCheckInGuest(created, 'self');
+    } catch (err) {
+      console.error('Error adding self guest:', err);
     }
   };
 
@@ -328,68 +358,71 @@ export function CheckIn() {
         </div>
       )}
 
-      {/* MODE 2: TAMU MANDIRI (SELF CHECK-IN) */}
+      {/* MODE 1: TAMU MANDIRI (SELF CHECK-IN) */}
       {activeTab === 'self' && (
         <div className="space-y-4">
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 text-center space-y-4 shadow-sm">
-            <div className="w-14 h-14 mx-auto rounded-2xl bg-navy-50 text-navy-900 border border-navy-200 flex items-center justify-center">
-              <QrCode className="w-7 h-7" />
-            </div>
-            <div>
-              <h3 className="font-serif font-bold text-lg text-navy-950">
-                Self Check-in Tamu
+          <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+            <div className="text-center space-y-1">
+              <span className="text-[10px] font-bold text-navy-900 uppercase tracking-widest bg-navy-50 px-2.5 py-1 rounded-full border border-navy-200 inline-block mb-1">
+                Buku Tamu Digital Mandiri
+              </span>
+              <h3 className="font-serif font-bold text-xl text-navy-950">
+                Cari & Konfirmasi Nama Anda
               </h3>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
-                Scan standee akrilik di meja resepsionis atau pilih nama Anda sendiri di bawah untuk konfirmasi kehadiran.
+              <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                Ketik nama Anda di bawah ini, lalu klik tombol konfirmasi kehadiran.
               </p>
             </div>
 
-            <button
-              onClick={() => setIsScannerOpen(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-navy-950 to-navy-900 text-white font-bold text-xs rounded-xl transition shadow-md"
-            >
-              <Camera className="w-4 h-4 text-gold-400" />
-              <span>Scan QR Meja Resepsionis</span>
-            </button>
-          </div>
-
-          {/* Quick Select My Name */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-            <h4 className="text-xs font-semibold text-navy-900 uppercase tracking-wider">
-              Konfirmasi Mandiri dengan Nama Anda
-            </h4>
+            {/* Search Input Box */}
             <div className="relative">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 transform -translate-y-1/2" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Cari nama Anda di undangan..."
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2.5 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-navy-600 focus:bg-white transition"
+                placeholder="Ketik nama Anda (Contoh: Budi, Agus, Sisca...)"
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-10 pr-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-navy-600 focus:bg-white shadow-inner transition"
               />
             </div>
 
-            <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
+            {/* List Tamu Hasil Pencarian */}
+            <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto pr-1">
               {filteredGuests.length === 0 ? (
-                <div className="py-6 text-center text-slate-400 text-xs">
-                  {searchQuery ? 'Nama tidak ditemukan dalam daftar undangan.' : 'Belum ada data tamu undangan.'}
+                <div className="py-8 text-center text-slate-400 text-xs space-y-3">
+                  <p className="text-slate-500 font-semibold">
+                    {searchQuery ? `Nama "${searchQuery}" belum ada di daftar undangan.` : 'Belum ada daftar tamu undangan.'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelfNewName(searchQuery);
+                      setIsSelfNewGuestOpen(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-navy-950 hover:bg-navy-900 text-white rounded-xl text-xs font-bold transition shadow-md"
+                  >
+                    <span>+ Tulis Nama Saya & Check-in Langsung</span>
+                  </button>
                 </div>
               ) : (
                 filteredGuests.map((guest) => (
-                  <div key={guest.id} className="py-2.5 flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-xs text-navy-950">{guest.name}</p>
-                      <p className="text-[10px] text-slate-500">{guest.table}</p>
+                  <div key={guest.id} className="py-3 flex items-center justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <p className="font-bold text-sm text-navy-950">{guest.name}</p>
+                      <p className="text-[11px] text-slate-500">
+                        {guest.category} • {guest.table} • {guest.pax} Orang
+                      </p>
                     </div>
+
                     {!guest.checkedIn ? (
                       <button
                         onClick={() => handleCheckInGuest(guest, 'self')}
-                        className="px-3 py-1 bg-navy-950 hover:bg-navy-900 text-white font-bold text-xs rounded-lg transition shadow-xs"
+                        className="px-4 py-2 bg-navy-950 hover:bg-navy-900 text-white font-bold text-xs rounded-xl transition shadow-md active:scale-95 shrink-0"
                       >
-                        Saya Hadir!
+                        Ini Saya, Konfirmasi Hadir
                       </button>
                     ) : (
-                      <span className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
+                      <span className="text-xs text-emerald-700 font-bold flex items-center gap-1 shrink-0 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                         <span>Sudah Hadir</span>
                       </span>
@@ -398,6 +431,88 @@ export function CheckIn() {
                 ))
               )}
             </div>
+
+            {/* Tombol Tambahan */}
+            <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setIsSelfNewGuestOpen(true)}
+                className="text-xs text-navy-900 hover:text-navy-700 font-semibold underline"
+              >
+                + Nama Anda Belum Terdaftar? Klik di Sini
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsScannerOpen(true)}
+                className="text-xs text-slate-500 hover:text-navy-900 flex items-center gap-1"
+              >
+                <Camera className="w-3.5 h-3.5" />
+                <span>Punya kartu tiket QR? Scan di sini</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Tambah Tamu Baru di Mode Mandiri */}
+      {isSelfNewGuestOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/70 backdrop-blur-md animate-fade-in">
+          <div className="relative w-full max-w-sm bg-white border border-slate-200 rounded-3xl p-6 shadow-2xl space-y-4">
+            <div>
+              <h3 className="font-serif font-bold text-lg text-navy-950">
+                Check-in Tamu Baru
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Masukkan nama Anda untuk langsung konfirmasi kehadiran di buku tamu.
+              </p>
+            </div>
+
+            <form onSubmit={handleSelfNewGuestSubmit} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Nama Anda / Keluarga
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={selfNewName}
+                  onChange={(e) => setSelfNewName(e.target.value)}
+                  placeholder="Contoh: Budi Santoso & Istri"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-navy-600 focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Jumlah Orang (Pax)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={selfNewPax}
+                  onChange={(e) => setSelfNewPax(Number(e.target.value) || 1)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-navy-600 focus:bg-white"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsSelfNewGuestOpen(false)}
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 bg-navy-950 hover:bg-navy-900 text-white font-bold text-xs rounded-xl shadow-md"
+                >
+                  Konfirmasi Hadir
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

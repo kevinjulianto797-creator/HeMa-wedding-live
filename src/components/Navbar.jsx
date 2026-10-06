@@ -1,3 +1,4 @@
+import React, { useState, useEffect, useRef } from 'react';
 import { RefreshCw, ArrowLeft } from 'lucide-react';
 import { syncService } from '../services/syncService';
 import { getWeddingSettings } from '../services/weddingSettings';
