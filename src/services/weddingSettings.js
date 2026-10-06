@@ -28,22 +28,73 @@ export function getWeddingSettings() {
       settings = { ...settings, ...JSON.parse(saved) };
     }
 
-    // Auto-detect & sync if opened with URL parameters (e.g. ?couple=Cecep+%26+Memey or ?mempelai=...)
+    // Auto-detect & sync if opened with URL parameters (e.g. ?couple=...&venue=...&ws=...)
     if (typeof window !== 'undefined' && window.location.search) {
       const urlParams = new URLSearchParams(window.location.search);
       const coupleParam = urlParams.get('couple') || urlParams.get('mempelai');
-      if (coupleParam && coupleParam.trim() && settings.coupleTitle !== coupleParam.trim()) {
+      const venueParam = urlParams.get('venue') || urlParams.get('lokasi');
+      const dateParam = urlParams.get('date') || urlParams.get('tgl');
+      const akadParam = urlParams.get('akad');
+      const recParam = urlParams.get('rec') || urlParams.get('resepsi');
+      const initParam = urlParams.get('init');
+      const wsParam = urlParams.get('ws') || urlParams.get('webhook');
+
+      let hasChanges = false;
+
+      if (coupleParam && coupleParam.trim()) {
         const parts = coupleParam.split('&').map(s => s.trim());
         const groom = parts[0] || settings.groomName;
         const bride = parts[1] || settings.brideName;
-        settings = {
-          ...settings,
-          groomName: groom,
-          brideName: bride,
-          coupleTitle: coupleParam.trim(),
-          initials: `${groom[0] || 'C'}${bride[0] || 'M'}`.toUpperCase(),
-        };
+        settings.groomName = groom;
+        settings.brideName = bride;
+        settings.coupleTitle = coupleParam.trim();
+        settings.initials = initParam || `${groom[0] || 'C'}${bride[0] || 'M'}`.toUpperCase();
+        hasChanges = true;
+      }
+
+      if (venueParam && venueParam.trim()) {
+        settings.venueName = venueParam.trim();
+        hasChanges = true;
+      }
+
+      if (dateParam && dateParam.trim()) {
+        settings.weddingDateFormatted = dateParam.trim();
+        hasChanges = true;
+      }
+
+      if (akadParam && akadParam.trim()) {
+        settings.akadTime = akadParam.trim();
+        hasChanges = true;
+      }
+
+      if (recParam && recParam.trim()) {
+        settings.receptionTime = recParam.trim();
+        hasChanges = true;
+      }
+
+      if (initParam && initParam.trim()) {
+        settings.initials = initParam.trim().toUpperCase();
+        hasChanges = true;
+      }
+
+      if (hasChanges) {
         localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+      }
+
+      // Auto-sync Google Apps Script Webhook URL to guest's device
+      if (wsParam && wsParam.trim().startsWith('http')) {
+        try {
+          const rawGoogle = localStorage.getItem('hema_google_settings');
+          const currentGoogle = rawGoogle ? JSON.parse(rawGoogle) : {};
+          if (currentGoogle.sheetsWebhookUrl !== wsParam.trim()) {
+            localStorage.setItem('hema_google_settings', JSON.stringify({
+              ...currentGoogle,
+              sheetsWebhookUrl: wsParam.trim(),
+            }));
+          }
+        } catch (e) {
+          console.warn('Error saving Google webhook from URL:', e);
+        }
       }
     }
 
@@ -88,7 +139,29 @@ export function saveWeddingSettings(newSettings) {
 export function getShareableWeddingUrl(settings) {
   const current = settings || getWeddingSettings();
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://wedding-live.hemanet.my.id';
-  return `${origin}/?couple=${encodeURIComponent(current.coupleTitle || 'Cecep & Memey')}`;
+  const params = new URLSearchParams();
+
+  if (current.coupleTitle) params.set('couple', current.coupleTitle);
+  if (current.venueName) params.set('venue', current.venueName);
+  if (current.weddingDateFormatted) params.set('date', current.weddingDateFormatted);
+  if (current.akadTime) params.set('akad', current.akadTime);
+  if (current.receptionTime) params.set('rec', current.receptionTime);
+  if (current.initials) params.set('init', current.initials);
+
+  // Otomatis sertakan URL Webhook Google Apps Script agar HP tamu yang scan barcode langsung terhubung ke database yang sama
+  try {
+    const rawGoogle = localStorage.getItem('hema_google_settings');
+    if (rawGoogle) {
+      const parsedGoogle = JSON.parse(rawGoogle);
+      if (parsedGoogle.sheetsWebhookUrl && parsedGoogle.sheetsWebhookUrl.startsWith('http')) {
+        params.set('ws', parsedGoogle.sheetsWebhookUrl);
+      }
+    }
+  } catch (e) {
+    console.warn(e);
+  }
+
+  return `${origin}/?${params.toString()}`;
 }
 
 export function getWhatsAppShareText(settings) {

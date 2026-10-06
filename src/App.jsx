@@ -74,9 +74,9 @@ export function App() {
       {/* Page Content Container */}
       <main className="flex-1 max-w-4xl w-full mx-auto px-4 pt-4 sm:pt-6">
         {activePage === 'home' && <Home setActivePage={handlePageChange} />}
-        {activePage === 'checkin' && <CheckIn />}
-        {activePage === 'moments' && <Moments />}
-        {activePage === 'wishes' && <Wishes />}
+        {activePage === 'checkin' && <CheckIn setActivePage={handlePageChange} />}
+        {activePage === 'moments' && <Moments setActivePage={handlePageChange} />}
+        {activePage === 'wishes' && <Wishes setActivePage={handlePageChange} />}
         {activePage === 'admin' && <Admin setActivePage={handlePageChange} />}
         {activePage === 'photographer' && <Photographer setActivePage={handlePageChange} />}
       </main>

@@ -5,8 +5,16 @@ import {
   markWishSynced,
   getPendingMoments,
   markMomentSynced,
+  mergeCloudMoments,
+  mergeCloudWishes,
+  mergeCloudCheckins,
 } from './db';
-import { syncCheckinToGoogle, syncWishToGoogle, syncMediaToGoogle } from './googleSync';
+import { 
+  syncCheckinToGoogle, 
+  syncWishToGoogle, 
+  syncMediaToGoogle,
+  pullCloudData 
+} from './googleSync';
 
 class SyncService {
   constructor() {
@@ -27,6 +35,13 @@ class SyncService {
         this.notifyListeners();
         console.warn('⚠️ [SyncService] Sinyal offline! Mode penyimpanan lokal aktif.');
       });
+
+      // Polling berkala setiap 7 detik untuk menarik foto, ucapan, dan checkin baru dari Google Sheets & Drive
+      setInterval(() => {
+        if (this.isOnline && !this.isSyncing) {
+          this.pullFromCloud();
+        }
+      }, 7000);
     }
   }
 
@@ -93,12 +108,42 @@ class SyncService {
       }
 
       console.log('✅ [SyncService] Seluruh data offline berhasil disinkronisasi!');
+      await this.pullFromCloud();
       window.dispatchEvent(new CustomEvent('wedding-sync-completed'));
     } catch (error) {
       console.error('❌ [SyncService] Gagal saat sinkronisasi:', error);
     } finally {
       this.isSyncing = false;
       this.notifyListeners();
+    }
+  }
+
+  // 4. Tarik data terbaru dari Cloud (Google Sheets & Drive) agar foto tamu di HP langsung masuk ke Laptop
+  async pullFromCloud() {
+    try {
+      const cloudData = await pullCloudData();
+      if (!cloudData || cloudData.status !== 'success') return;
+
+      let hasNewData = false;
+      if (Array.isArray(cloudData.moments) && cloudData.moments.length > 0) {
+        const addedMoments = await mergeCloudMoments(cloudData.moments);
+        if (addedMoments > 0) hasNewData = true;
+      }
+      if (Array.isArray(cloudData.wishes) && cloudData.wishes.length > 0) {
+        const addedWishes = await mergeCloudWishes(cloudData.wishes);
+        if (addedWishes > 0) hasNewData = true;
+      }
+      if (Array.isArray(cloudData.checkins) && cloudData.checkins.length > 0) {
+        const addedCheckins = await mergeCloudCheckins(cloudData.checkins);
+        if (addedCheckins > 0) hasNewData = true;
+      }
+
+      if (hasNewData) {
+        console.log('🔄 [SyncService] Data foto/doa baru dari Google Sheets & Drive berhasil diterima!');
+        window.dispatchEvent(new CustomEvent('wedding-sync-completed'));
+      }
+    } catch (e) {
+      console.warn('SyncService pullFromCloud error:', e);
     }
   }
 }

@@ -190,13 +190,13 @@ export function Wishes() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Nama Anda
+              Nama Anda (Opsional)
             </label>
             <input
               type="text"
               value={senderName}
               onChange={(e) => setSenderName(e.target.value)}
-              placeholder="Contoh: Budi Santoso & Keluarga"
+              placeholder="Contoh: Budi Santoso (Kosongkan untuk Tamu Undangan)"
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-navy-600 focus:bg-white transition"
             />
           </div>

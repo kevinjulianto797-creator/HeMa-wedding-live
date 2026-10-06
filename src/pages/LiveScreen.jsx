@@ -12,13 +12,13 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import { getAllMoments, getAllWishes, getAllCheckins } from '../services/db';
-import { getWeddingSettings } from '../services/weddingSettings';
+import { getWeddingSettings, getShareableWeddingUrl } from '../services/weddingSettings';
 
 export function LiveScreen({ setActivePage }) {
   const [settings, setSettings] = useState(getWeddingSettings());
   const [moments, setMoments] = useState([]);
   const [wishes, setWishes] = useState([]);
-  const [checkinsCount, setCheckinsCount] = useState(142);
+  const [checkinsCount, setCheckinsCount] = useState(0);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [qrVenueUrl, setQrVenueUrl] = useState('');
@@ -27,12 +27,19 @@ export function LiveScreen({ setActivePage }) {
   // Generate QR for Guests to scan while looking at stage screen
   useEffect(() => {
     const handleSettingsUpdate = (e) => {
-      setSettings(e.detail || getWeddingSettings());
+      const updated = e.detail || getWeddingSettings();
+      setSettings(updated);
+      const venueLink = getShareableWeddingUrl(updated);
+      QRCode.toDataURL(venueLink, {
+        width: 180,
+        margin: 1,
+        color: { dark: '#0A192F', light: '#FFFFFF' },
+      }).then(setQrVenueUrl).catch(console.error);
     };
 
     window.addEventListener('wedding-settings-updated', handleSettingsUpdate);
 
-    const venueLink = window.location.origin || 'https://hema-wedding.live';
+    const venueLink = getShareableWeddingUrl(settings);
     QRCode.toDataURL(venueLink, {
       width: 180,
       margin: 1,
@@ -58,13 +65,16 @@ export function LiveScreen({ setActivePage }) {
           getAllWishes(),
           getAllCheckins(),
         ]);
-        if (m && m.length > 0) {
-          setMoments(m);
+        if (m) {
+          const realMoments = (m || []).filter(
+            (item) => !item.previewUrl?.includes('images.unsplash.com')
+          );
+          setMoments(realMoments);
         }
-        if (w && w.length > 0) {
+        if (w) {
           setWishes(w);
         }
-        setCheckinsCount(140 + c.length);
+        setCheckinsCount(c ? c.length : 0);
       } catch (e) {
         console.error('LiveScreen fetch error:', e);
       }

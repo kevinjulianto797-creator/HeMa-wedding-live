@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, ArrowLeft } from 'lucide-react';
 import { syncService } from '../services/syncService';
 import { getWeddingSettings } from '../services/weddingSettings';
 
@@ -77,12 +76,26 @@ export function Navbar({ activePage, setActivePage }) {
   return (
     <header className="sticky top-0 z-40 w-full bg-white/95 border-b border-navy-100/80 backdrop-blur-md shadow-sm">
       <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center justify-between">
-        {/* Brand & Couple Names (Secret Admin trigger on 5 taps) */}
-        <div 
-          onClick={handleLogoTap}
-          className="flex items-center gap-2.5 cursor-pointer group select-none"
-          title="Klik untuk Beranda"
-        >
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Tombol Kembali (Muncul saat tidak di halaman Beranda) */}
+          {activePage !== 'home' && (
+            <button
+              type="button"
+              onClick={() => setActivePage('home')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-navy-950 text-xs font-bold transition border border-slate-200 shadow-xs group"
+              title="Kembali ke Beranda"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 text-navy-900 group-hover:-translate-x-0.5 transition" />
+              <span>Kembali</span>
+            </button>
+          )}
+
+          {/* Brand & Couple Names (Secret Admin trigger on 5 taps) */}
+          <div 
+            onClick={handleLogoTap}
+            className="flex items-center gap-2.5 cursor-pointer group select-none"
+            title="Klik untuk Beranda"
+          >
           <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-navy-900 via-navy-800 to-gold-500 p-[1.5px] shadow-sm">
             <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
               <span className="font-serif text-sm font-bold text-navy-900">
@@ -90,13 +103,14 @@ export function Navbar({ activePage, setActivePage }) {
               </span>
             </div>
           </div>
-          <div>
-            <h1 className="font-serif text-base sm:text-lg font-bold tracking-wide text-navy-950 group-hover:text-navy-700 transition">
-              {settings.coupleTitle || 'Cecep & Memey'}
-            </h1>
-            <p className="text-[10px] text-slate-500 font-medium tracking-wider uppercase">
-              {settings.weddingDateFormatted || 'Minggu, 18 Okt 2026'} • Live
-            </p>
+            <div>
+              <h1 className="font-serif text-base sm:text-lg font-bold tracking-wide text-navy-950 group-hover:text-navy-700 transition">
+                {settings.coupleTitle || 'Cecep & Memey'}
+              </h1>
+              <p className="text-[10px] text-slate-500 font-medium tracking-wider uppercase">
+                {settings.weddingDateFormatted || 'Minggu, 18 Okt 2026'} • Live
+              </p>
+            </div>
           </div>
         </div>
 

@@ -225,3 +225,23 @@ export function exportWishesToCSV(wishes) {
   link.click();
   document.body.removeChild(link);
 }
+
+// 5. Pull Cloud Data (2-Way Realtime Synchronization)
+export async function pullCloudData() {
+  const settings = getGoogleSettings();
+  if (!settings.sheetsWebhookUrl || !settings.sheetsWebhookUrl.startsWith('http')) {
+    return null;
+  }
+
+  try {
+    const res = await fetch(`${settings.sheetsWebhookUrl}?action=GET_ALL`, {
+      method: 'GET',
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json;
+  } catch (err) {
+    console.warn('Error pulling cloud data from Google Apps Script:', err);
+    return null;
+  }
+}

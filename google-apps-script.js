@@ -201,13 +201,14 @@ function doPost(e) {
         var decodedMedia = Utilities.base64Decode(data.fileBase64);
         var mediaBlob = Utilities.newBlob(decodedMedia, mime, mediaFileName);
         var mediaFile = targetFolder.createFile(mediaBlob);
-        mediaFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-        driveMediaUrl = mediaFile.getUrl();
+        var fileId = mediaFile.getId();
+        // Gunakan CDN langsung lh3.googleusercontent.com agar gambar dapat langsung tampil di <img> tag semua perangkat tanpa login
+        driveMediaUrl = "https://lh3.googleusercontent.com/d/" + fileId;
       }
 
       sheetMedia.appendRow([
         new Date(data.timestamp || new Date()),
-        data.uploaderName,
+        data.uploaderName || "Tamu Undangan",
         data.uploaderRole || "guest",
         data.category || "Momen Bahagia",
         data.caption || "",
@@ -215,7 +216,12 @@ function doPost(e) {
         driveMediaUrl
       ]);
 
-      return sendJsonResponse({ status: "success", type: "media", driveUrl: driveMediaUrl });
+      return sendJsonResponse({ 
+        status: "success", 
+        type: "media", 
+        driveUrl: driveMediaUrl,
+        fileId: fileId 
+      });
     }
 
     return sendJsonResponse({ status: "unknown_action" });
@@ -225,9 +231,103 @@ function doPost(e) {
   }
 }
 
+// 4. Webhook Reader (doGet) untuk Sinkronisasi 2-Arah ke Laptop, Proyektor, & HP Tamu
 function doGet(e) {
-  return ContentService.createTextOutput("Webhook HeMa Wedding Live Aktif dan Terhubung ke Google Sheets & Drive!")
-    .setMimeType(ContentService.MimeType.TEXT);
+  try {
+    var action = (e && e.parameter && e.parameter.action) ? e.parameter.action : "GET_ALL";
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    if (action === "PING") {
+      return sendJsonResponse({ status: "success", message: "Webhook HeMa Wedding Live Aktif!" });
+    }
+
+    // A. Ambil Galeri Foto & Video
+    var sheetMedia = ss.getSheetByName("Galeri_Media");
+    var moments = [];
+    if (sheetMedia && sheetMedia.getLastRow() > 1) {
+      var mediaRows = sheetMedia.getRange(2, 1, sheetMedia.getLastRow() - 1, 7).getValues();
+      for (var i = 0; i < mediaRows.length; i++) {
+        var row = mediaRows[i];
+        if (row[0] && row[6]) {
+          var rawUrl = String(row[6]);
+          var imgUrl = rawUrl;
+          var fileIdMatch = rawUrl.match(/[-\w]{25,}/);
+          if (fileIdMatch && !rawUrl.includes("lh3.googleusercontent.com")) {
+            imgUrl = "https://lh3.googleusercontent.com/d/" + fileIdMatch[0];
+          }
+
+          moments.push({
+            id: "m_cloud_" + i + "_" + new Date(row[0]).getTime(),
+            timestamp: new Date(row[0]).toISOString(),
+            uploaderName: row[1] || "Tamu Undangan",
+            uploaderRole: row[2] || "guest",
+            category: row[3] || "Momen Bahagia",
+            caption: row[4] || "",
+            type: row[5] || "photo",
+            previewUrl: imgUrl,
+            likes: 1,
+            synced: true
+          });
+        }
+      }
+    }
+
+    // B. Ambil Ucapan Doa & Voice Notes
+    var sheetUcapan = ss.getSheetByName("Ucapan_Doa");
+    var wishes = [];
+    if (sheetUcapan && sheetUcapan.getLastRow() > 1) {
+      var ucapanRows = sheetUcapan.getRange(2, 1, sheetUcapan.getLastRow() - 1, 7).getValues();
+      for (var j = 0; j < ucapanRows.length; j++) {
+        var uRow = ucapanRows[j];
+        if (uRow[0]) {
+          wishes.push({
+            id: "w_cloud_" + j + "_" + new Date(uRow[0]).getTime(),
+            timestamp: new Date(uRow[0]).toISOString(),
+            senderName: uRow[1] || "Tamu Undangan",
+            relationship: uRow[2] || "Teman",
+            type: (uRow[3] && String(uRow[3]).indexOf("Voice") >= 0) ? "voice" : "text",
+            audioDuration: Number(uRow[4] || 0),
+            message: uRow[5] || "",
+            audioUrl: uRow[6] || "",
+            synced: true
+          });
+        }
+      }
+    }
+
+    // C. Ambil Data Kehadiran Check-In
+    var sheetHadir = ss.getSheetByName("Kehadiran");
+    var checkins = [];
+    if (sheetHadir && sheetHadir.getLastRow() > 1) {
+      var hadirRows = sheetHadir.getRange(2, 1, sheetHadir.getLastRow() - 1, 7).getValues();
+      for (var k = 0; k < hadirRows.length; k++) {
+        var hRow = hadirRows[k];
+        if (hRow[0]) {
+          checkins.push({
+            id: "c_cloud_" + k + "_" + new Date(hRow[0]).getTime(),
+            timestamp: new Date(hRow[0]).toISOString(),
+            guestId: hRow[1] || "-",
+            guestName: hRow[2] || "Tamu Undangan",
+            category: hRow[3] || "Tamu Undangan",
+            pax: Number(hRow[4] || 1),
+            table: hRow[5] || "-",
+            checkedInBy: hRow[6] || "Scanner Barcode",
+            synced: true
+          });
+        }
+      }
+    }
+
+    return sendJsonResponse({
+      status: "success",
+      moments: moments,
+      wishes: wishes,
+      checkins: checkins
+    });
+
+  } catch (err) {
+    return sendJsonResponse({ status: "error", message: err.toString() });
+  }
 }
 
 // --- HELPER FUNCTIONS ---

@@ -177,3 +177,92 @@ export async function getAppState(key) {
   const record = await db.get('app_state', key);
   return record ? record.value : null;
 }
+
+// --- CLOUD MERGE OPERATIONS (2-Way Realtime Sync) ---
+export async function mergeCloudMoments(cloudMoments) {
+  if (!Array.isArray(cloudMoments) || cloudMoments.length === 0) return 0;
+  const db = await initDB();
+  const localMoments = await db.getAll('moments');
+  const existingUrls = new Set(localMoments.map(m => m.previewUrl).filter(Boolean));
+  const existingKeys = new Set(localMoments.map(m => `${m.timestamp}_${m.uploaderName}`));
+
+  let addedCount = 0;
+  for (const cm of cloudMoments) {
+    const key = `${cm.timestamp}_${cm.uploaderName}`;
+    if (!existingUrls.has(cm.previewUrl) && !existingKeys.has(key)) {
+      await db.put('moments', {
+        id: cm.id || `mmt_cloud_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        caption: cm.caption || '',
+        uploaderName: cm.uploaderName || 'Tamu Undangan',
+        uploaderRole: cm.uploaderRole || 'guest',
+        type: cm.type || 'photo',
+        category: cm.category || 'Momen Bahagia',
+        previewUrl: cm.previewUrl,
+        likes: cm.likes || 1,
+        timestamp: cm.timestamp || new Date().toISOString(),
+        synced: true,
+      });
+      if (cm.previewUrl) existingUrls.add(cm.previewUrl);
+      existingKeys.add(key);
+      addedCount++;
+    }
+  }
+  return addedCount;
+}
+
+export async function mergeCloudWishes(cloudWishes) {
+  if (!Array.isArray(cloudWishes) || cloudWishes.length === 0) return 0;
+  const db = await initDB();
+  const localWishes = await db.getAll('wishes');
+  const existingKeys = new Set(localWishes.map(w => `${w.timestamp}_${w.senderName}`));
+
+  let addedCount = 0;
+  for (const cw of cloudWishes) {
+    const key = `${cw.timestamp}_${cw.senderName}`;
+    if (!existingKeys.has(key)) {
+      await db.put('wishes', {
+        id: cw.id || `wsh_cloud_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        senderName: cw.senderName || 'Tamu Undangan',
+        relationship: cw.relationship || 'Teman',
+        message: cw.message || '',
+        type: cw.type || 'text',
+        audioBlob: null,
+        audioUrl: cw.audioUrl || null,
+        audioDuration: cw.audioDuration || 0,
+        timestamp: cw.timestamp || new Date().toISOString(),
+        synced: true,
+      });
+      existingKeys.add(key);
+      addedCount++;
+    }
+  }
+  return addedCount;
+}
+
+export async function mergeCloudCheckins(cloudCheckins) {
+  if (!Array.isArray(cloudCheckins) || cloudCheckins.length === 0) return 0;
+  const db = await initDB();
+  const localCheckins = await db.getAll('checkins');
+  const existingKeys = new Set(localCheckins.map(c => `${c.timestamp}_${c.guestName}`));
+
+  let addedCount = 0;
+  for (const cc of cloudCheckins) {
+    const key = `${cc.timestamp}_${cc.guestName}`;
+    if (!existingKeys.has(key)) {
+      await db.put('checkins', {
+        id: cc.id || `chk_cloud_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        guestId: cc.guestId || '-',
+        guestName: cc.guestName || 'Tamu Undangan',
+        pax: cc.pax || 1,
+        category: cc.category || 'Tamu Undangan',
+        table: cc.table || '-',
+        timestamp: cc.timestamp || new Date().toISOString(),
+        checkedInBy: cc.checkedInBy || 'self',
+        synced: true,
+      });
+      existingKeys.add(key);
+      addedCount++;
+    }
+  }
+  return addedCount;
+}

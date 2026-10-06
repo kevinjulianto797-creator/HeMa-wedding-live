@@ -604,17 +604,16 @@ export function Moments() {
             {/* Form details (only show when previewMedia is ready) */}
             {previewMedia && (
               <form onSubmit={handleUploadSubmit} className="space-y-4 pt-1">
-                {/* Uploader Name */}
+                {/* Uploader Name (Opsional) */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Nama Anda
+                    Nama Anda (Opsional)
                   </label>
                   <input
                     type="text"
-                    required
                     value={uploaderName}
                     onChange={(e) => setUploaderName(e.target.value)}
-                    placeholder="Contoh: Rian & Nisa (Teman Kuliah)"
+                    placeholder="Contoh: Rian & Nisa (Kosongkan untuk Tamu Undangan)"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-navy-600 focus:bg-white transition"
                   />
                 </div>
