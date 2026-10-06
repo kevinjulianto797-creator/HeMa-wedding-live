@@ -17,9 +17,9 @@ import { getWeddingSettings } from '../services/weddingSettings';
 export function Home({ setActivePage }) {
   const [settings, setSettings] = useState(getWeddingSettings());
   const [stats, setStats] = useState({
-    checkedInCount: 142,
-    momentsCount: 5,
-    wishesCount: 3,
+    checkedInCount: 0,
+    momentsCount: 0,
+    wishesCount: 0,
   });
 
   const [recentMoments, setRecentMoments] = useState([]);
@@ -40,7 +40,7 @@ export function Home({ setActivePage }) {
         ]);
 
         setStats({
-          checkedInCount: 140 + checkins.length,
+          checkedInCount: checkins.length,
           momentsCount: moments.length,
           wishesCount: wishes.length,
         });

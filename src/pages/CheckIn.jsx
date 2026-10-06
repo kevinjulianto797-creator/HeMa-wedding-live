@@ -22,7 +22,7 @@ import { syncService } from '../services/syncService';
 import { getAllGuests } from '../services/guestService';
 
 export function CheckIn() {
-  const [activeTab, setActiveTab] = useState('receptionist'); // 'receptionist' | 'self'
+  const [activeTab, setActiveTab] = useState('self'); // Default Mode 1: 'self' (Tamu Mandiri) | Mode 2: 'receptionist' (Panitia)
   const [guests, setGuests] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -157,16 +157,6 @@ export function CheckIn() {
         {/* Tab Selector */}
         <div className="inline-flex p-1 bg-slate-100 border border-slate-200 rounded-2xl mt-2">
           <button
-            onClick={() => setActiveTab('receptionist')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition ${
-              activeTab === 'receptionist'
-                ? 'bg-navy-950 text-white shadow-xs font-bold'
-                : 'text-slate-600 hover:text-navy-900'
-            }`}
-          >
-            Mode 1: Panitia / Resepsionis
-          </button>
-          <button
             onClick={() => setActiveTab('self')}
             className={`px-4 py-2 rounded-xl text-xs font-semibold transition ${
               activeTab === 'self'
@@ -174,7 +164,17 @@ export function CheckIn() {
                 : 'text-slate-600 hover:text-navy-900'
             }`}
           >
-            Mode 2: Tamu Mandiri
+            Mode 1: Tamu Mandiri
+          </button>
+          <button
+            onClick={() => setActiveTab('receptionist')}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition ${
+              activeTab === 'receptionist'
+                ? 'bg-navy-950 text-white shadow-xs font-bold'
+                : 'text-slate-600 hover:text-navy-900'
+            }`}
+          >
+            Mode 2: Panitia / Resepsionis
           </button>
         </div>
       </div>
@@ -370,27 +370,33 @@ export function CheckIn() {
             </div>
 
             <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
-              {filteredGuests.map((guest) => (
-                <div key={guest.id} className="py-2.5 flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-xs text-navy-950">{guest.name}</p>
-                    <p className="text-[10px] text-slate-500">{guest.table}</p>
-                  </div>
-                  {!guest.checkedIn ? (
-                    <button
-                      onClick={() => handleCheckInGuest(guest, 'self')}
-                      className="px-3 py-1 bg-navy-950 hover:bg-navy-900 text-white font-bold text-xs rounded-lg transition shadow-xs"
-                    >
-                      Saya Hadir!
-                    </button>
-                  ) : (
-                    <span className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Sudah Hadir</span>
-                    </span>
-                  )}
+              {filteredGuests.length === 0 ? (
+                <div className="py-6 text-center text-slate-400 text-xs">
+                  {searchQuery ? 'Nama tidak ditemukan dalam daftar undangan.' : 'Belum ada data tamu undangan.'}
                 </div>
-              ))}
+              ) : (
+                filteredGuests.map((guest) => (
+                  <div key={guest.id} className="py-2.5 flex items-center justify-between">
+                    <div>
+                      <p className="font-semibold text-xs text-navy-950">{guest.name}</p>
+                      <p className="text-[10px] text-slate-500">{guest.table}</p>
+                    </div>
+                    {!guest.checkedIn ? (
+                      <button
+                        onClick={() => handleCheckInGuest(guest, 'self')}
+                        className="px-3 py-1 bg-navy-950 hover:bg-navy-900 text-white font-bold text-xs rounded-lg transition shadow-xs"
+                      >
+                        Saya Hadir!
+                      </button>
+                    ) : (
+                      <span className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Sudah Hadir</span>
+                      </span>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

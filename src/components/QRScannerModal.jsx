@@ -53,27 +53,68 @@ export function QRScannerModal({ isOpen, onClose, onScanSuccess, title = 'Scan Q
           aspectRatio: 1.0,
         };
 
-        await scannerInstance.start(
-          { facingMode: facingMode },
-          config,
-          (decodedText) => {
-            console.log('✅ QR Detected:', decodedText);
-            playBeep();
-            // Stop scanning and trigger success
-            stopScanner().then(() => {
-              onScanSuccess(decodedText);
-            });
-          },
-          (errorMessage) => {
-            // Non-critical scan failure per frame, ignored
+        // Deteksi seluruh perangkat kamera (Webcam laptop/PC, kamera depan & belakang HP)
+        let selectedCameraConfig = null;
+        try {
+          const devices = await Html5Qrcode.getCameras();
+          if (devices && devices.length > 0) {
+            if (facingMode === 'environment') {
+              const backCam = devices.find((d) => {
+                const label = (d.label || '').toLowerCase();
+                return label.includes('back') || label.includes('rear') || label.includes('environment') || label.includes('belakang');
+              });
+              // Jika di laptop/PC (tidak ada kamera belakang), gunakan kamera yang ada (devices[0].id)
+              selectedCameraConfig = backCam ? backCam.id : devices[0].id;
+            } else {
+              const frontCam = devices.find((d) => {
+                const label = (d.label || '').toLowerCase();
+                return label.includes('front') || label.includes('user') || label.includes('depan');
+              });
+              selectedCameraConfig = frontCam ? frontCam.id : devices[0].id;
+            }
           }
-        );
+        } catch (camListErr) {
+          console.warn('Gagal membaca daftar kamera via getCameras, beralih ke constraint ideal:', camListErr);
+        }
+
+        // Jika tidak ada ID spesifik, gunakan facingMode 'ideal' agar tidak error di PC/laptop
+        const cameraToStart = selectedCameraConfig || { facingMode: { ideal: facingMode } };
+
+        try {
+          await scannerInstance.start(
+            cameraToStart,
+            config,
+            (decodedText) => {
+              console.log('✅ QR Detected:', decodedText);
+              playBeep();
+              stopScanner().then(() => {
+                onScanSuccess(decodedText);
+              });
+            },
+            () => {}
+          );
+        } catch (startErr) {
+          console.warn('Percobaan pertama kamera gagal, mencoba fallback webcam laptop/PC...', startErr);
+          // Fallback kedua: Coba langsung kamera depan atau webcam default
+          await scannerInstance.start(
+            { facingMode: 'user' },
+            config,
+            (decodedText) => {
+              console.log('✅ QR Detected (fallback webcam):', decodedText);
+              playBeep();
+              stopScanner().then(() => {
+                onScanSuccess(decodedText);
+              });
+            },
+            () => {}
+          );
+        }
 
         setIsScanning(true);
       } catch (err) {
-        console.error('Camera Scanner Error:', err);
+        console.error('Camera Scanner Final Error:', err);
         setScannerError(
-          'Tidak dapat mengakses kamera. Pastikan izin kamera aktif dan menggunakan browser HTTPS.'
+          'Tidak dapat mengakses kamera. Pastikan izin kamera aktif pada browser Anda.'
         );
         setIsScanning(false);
       }

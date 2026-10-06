@@ -29,8 +29,10 @@ import {
   FileUp,
   MessageCircle,
   Copy,
-  Check
+  Check,
+  Printer
 } from 'lucide-react';
+import QRCode from 'qrcode';
 import { 
   getWeddingSettings, 
   saveWeddingSettings,
@@ -189,6 +191,63 @@ export function Admin({ setActivePage }) {
   };
 
   const [linkCopied, setLinkCopied] = useState(false);
+  const [shareQrDataUrl, setShareQrDataUrl] = useState('');
+  const [rawDateValue, setRawDateValue] = useState('');
+  const [akadStartTime, setAkadStartTime] = useState('08:00');
+  const [akadEndTime, setAkadEndTime] = useState('10:00');
+  const [recStartTime, setRecStartTime] = useState('11:00');
+  const [recEndTime, setRecEndTime] = useState('14:00');
+
+  // Generate QR code for share link whenever weddingForm updates
+  useEffect(() => {
+    const url = getShareableWeddingUrl(weddingForm);
+    QRCode.toDataURL(url, {
+      width: 450,
+      margin: 2,
+      color: {
+        dark: '#0A192F',
+        light: '#FFFFFF'
+      }
+    })
+      .then((res) => setShareQrDataUrl(res))
+      .catch((err) => console.error('Error generating share QR:', err));
+  }, [weddingForm]);
+
+  const handleDateChange = (e) => {
+    const val = e.target.value;
+    setRawDateValue(val);
+    if (!val) return;
+    try {
+      const d = new Date(val + 'T00:00:00');
+      const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+      const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+      const formatted = `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+      setWeddingForm((prev) => ({
+        ...prev,
+        weddingDateFormatted: formatted
+      }));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleAkadTimeChange = (start, end) => {
+    setAkadStartTime(start);
+    setAkadEndTime(end);
+    setWeddingForm((prev) => ({
+      ...prev,
+      akadTime: `${start} - ${end} WIB`
+    }));
+  };
+
+  const handleRecTimeChange = (start, end) => {
+    setRecStartTime(start);
+    setRecEndTime(end);
+    setWeddingForm((prev) => ({
+      ...prev,
+      receptionTime: `${start} - ${end} WIB`
+    }));
+  };
 
   const handleCopyShareLink = () => {
     const url = getShareableWeddingUrl(weddingForm);
@@ -201,6 +260,175 @@ export function Admin({ setActivePage }) {
     const text = getWhatsAppShareText(weddingForm);
     const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(waUrl, '_blank');
+  };
+
+  const handleDownloadQrPng = () => {
+    if (!shareQrDataUrl) return;
+    const a = document.createElement('a');
+    a.href = shareQrDataUrl;
+    a.download = `QR-Akses-Tamu-${weddingForm.groomName || 'Pernikahan'}.png`;
+    a.click();
+  };
+
+  const handlePrintBarcodePdf = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Mohon izinkan pop-up browser untuk mencetak atau mengunduh PDF.');
+      return;
+    }
+
+    const coupleTitle = `${weddingForm.groomName || 'Pengantin'} & ${weddingForm.brideName || 'Pengantin'}`;
+    const initials = weddingForm.initials || 'W';
+    const dateText = weddingForm.weddingDateFormatted || 'Hari Bahagia';
+    const venueText = weddingForm.venueName || 'Lokasi Acara';
+    const url = getShareableWeddingUrl(weddingForm);
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html lang="id">
+        <head>
+          <title>Barcode Akses Tamu - ${coupleTitle}</title>
+          <meta charset="utf-8" />
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap');
+            @page {
+              size: A4 portrait;
+              margin: 15mm;
+            }
+            body {
+              font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+              margin: 0;
+              padding: 24px;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              min-height: 90vh;
+              background-color: #f8fafc;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .card {
+              max-width: 480px;
+              width: 100%;
+              background: #ffffff;
+              border: 3px solid #0A192F;
+              border-radius: 28px;
+              padding: 36px 28px;
+              text-align: center;
+              box-shadow: 0 10px 30px rgba(10, 25, 47, 0.08);
+              box-sizing: border-box;
+            }
+            .inner-border {
+              border: 1.5px dashed #d4af37;
+              border-radius: 20px;
+              padding: 28px 20px;
+            }
+            .monogram {
+              font-family: 'Cinzel', serif;
+              font-size: 28px;
+              font-weight: 700;
+              color: #d4af37;
+              letter-spacing: 4px;
+              margin-bottom: 8px;
+            }
+            .title {
+              font-family: 'Cinzel', serif;
+              font-size: 26px;
+              font-weight: 700;
+              color: #0A192F;
+              margin: 0 0 6px;
+            }
+            .subtitle {
+              font-size: 13px;
+              color: #64748b;
+              margin: 0 0 20px;
+              line-height: 1.5;
+            }
+            .qr-wrapper {
+              background: #ffffff;
+              padding: 16px;
+              border-radius: 20px;
+              border: 2px solid #e2e8f0;
+              display: inline-block;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+              margin-bottom: 20px;
+            }
+            .qr-wrapper img {
+              width: 230px;
+              height: 230px;
+              display: block;
+            }
+            .instruction {
+              font-size: 13px;
+              font-weight: 700;
+              color: #0A192F;
+              background: #f1f5f9;
+              padding: 8px 18px;
+              border-radius: 9999px;
+              margin: 0 auto 16px;
+              display: inline-block;
+            }
+            .details {
+              font-size: 13px;
+              color: #334155;
+              line-height: 1.6;
+              border-top: 1px solid #f1f5f9;
+              padding-top: 16px;
+            }
+            .details strong {
+              color: #0A192F;
+            }
+            .url {
+              font-family: monospace;
+              font-size: 10px;
+              color: #94a3b8;
+              margin-top: 12px;
+              word-break: break-all;
+            }
+            @media print {
+              body {
+                background: white;
+                padding: 0;
+              }
+              .card {
+                box-shadow: none;
+                border: 2px solid #0A192F;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div class="inner-border">
+              <div class="monogram">${initials}</div>
+              <h1 class="title">${coupleTitle}</h1>
+              <p class="subtitle">Buku Tamu Digital, Ucapan Doa & Galeri Momen Live</p>
+              
+              <div class="qr-wrapper">
+                <img src="${shareQrDataUrl}" alt="QR Barcode Akses Tamu" />
+              </div>
+              
+              <div>
+                <div class="instruction">📷 Scan Barcode dengan Kamera HP</div>
+              </div>
+              
+              <div class="details">
+                <div><strong>${dateText}</strong></div>
+                <div>${venueText}</div>
+              </div>
+
+              <div class="url">${url}</div>
+            </div>
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   const handleSaveWeddingSettings = (e) => {
@@ -746,7 +974,22 @@ export function Admin({ setActivePage }) {
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Format Teks Tanggal Acara
+                Pilih Tanggal Acara (Kalender Interaktif)
+              </label>
+              <input
+                type="date"
+                value={rawDateValue}
+                onChange={handleDateChange}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-navy-600 focus:bg-white transition cursor-pointer"
+              />
+              <p className="text-[10px] text-slate-500 mt-1">
+                Klik kalender di atas untuk memilih tanggal otomatis dalam Bahasa Indonesia.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Format Teks Tanggal Acara (Tampilan Layar & Undangan)
               </label>
               <input
                 type="text"
@@ -758,28 +1001,68 @@ export function Admin({ setActivePage }) {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Waktu Akad Nikah
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-slate-700">
+                  Waktu Akad Nikah
+                </label>
+                <span className="text-[10px] text-navy-700 font-medium">Scroll / Pilih Jam</span>
+              </div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <input
+                  type="time"
+                  value={akadStartTime}
+                  onChange={(e) => handleAkadTimeChange(e.target.value, akadEndTime)}
+                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs text-center text-slate-900 focus:outline-none focus:border-navy-600 focus:bg-white transition cursor-pointer"
+                  title="Jam Mulai Akad"
+                />
+                <span className="text-xs text-slate-400 font-bold">-</span>
+                <input
+                  type="time"
+                  value={akadEndTime}
+                  onChange={(e) => handleAkadTimeChange(akadStartTime, e.target.value)}
+                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs text-center text-slate-900 focus:outline-none focus:border-navy-600 focus:bg-white transition cursor-pointer"
+                  title="Jam Selesai Akad"
+                />
+              </div>
               <input
                 type="text"
                 value={weddingForm.akadTime}
                 onChange={(e) => setWeddingForm({ ...weddingForm, akadTime: e.target.value })}
                 placeholder="08:00 - 10:00 WIB"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-navy-600 focus:bg-white transition"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs text-slate-900 focus:outline-none focus:border-navy-600 focus:bg-white transition"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Waktu Resepsi
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-slate-700">
+                  Waktu Resepsi
+                </label>
+                <span className="text-[10px] text-navy-700 font-medium">Scroll / Pilih Jam</span>
+              </div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <input
+                  type="time"
+                  value={recStartTime}
+                  onChange={(e) => handleRecTimeChange(e.target.value, recEndTime)}
+                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs text-center text-slate-900 focus:outline-none focus:border-navy-600 focus:bg-white transition cursor-pointer"
+                  title="Jam Mulai Resepsi"
+                />
+                <span className="text-xs text-slate-400 font-bold">-</span>
+                <input
+                  type="time"
+                  value={recEndTime}
+                  onChange={(e) => handleRecTimeChange(recStartTime, e.target.value)}
+                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs text-center text-slate-900 focus:outline-none focus:border-navy-600 focus:bg-white transition cursor-pointer"
+                  title="Jam Selesai Resepsi"
+                />
+              </div>
               <input
                 type="text"
                 value={weddingForm.receptionTime}
                 onChange={(e) => setWeddingForm({ ...weddingForm, receptionTime: e.target.value })}
                 placeholder="11:00 - 14:00 WIB"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-navy-600 focus:bg-white transition"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs text-slate-900 focus:outline-none focus:border-navy-600 focus:bg-white transition"
               />
             </div>
 
@@ -818,12 +1101,12 @@ export function Admin({ setActivePage }) {
         </form>
 
         {/* CARD: BAGIKAN KE WHATSAPP & SOSIAL MEDIA */}
-        <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+        <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm space-y-5">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <div className="flex items-center gap-2">
               <MessageCircle className="w-5 h-5 text-emerald-600" />
               <h3 className="font-serif font-bold text-lg text-navy-950">
-                Bagikan Tautan ke WhatsApp & Sosial Media
+                Bagikan Tautan & Barcode Akses Tamu
               </h3>
             </div>
             <span className="text-[11px] px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
@@ -832,8 +1115,59 @@ export function Admin({ setActivePage }) {
           </div>
 
           <p className="text-xs text-slate-600 leading-relaxed">
-            Tautan di bawah ini otomatis menyematkan nama pengantin <strong>{weddingForm.groomName || 'Cecep'} & {weddingForm.brideName || 'Memey'}</strong>. Saat dibagikan ke WhatsApp, nama mempelai, deskripsi undangan, dan kartu pratinjau mewah akan otomatis muncul!
+            Tautan dan Barcode di bawah ini otomatis menyematkan nama pengantin <strong>{weddingForm.groomName || 'Cecep'} & {weddingForm.brideName || 'Memey'}</strong>. Tamu dapat scan barcode langsung di meja resepsionis atau buka link yang dikirimkan via WhatsApp.
           </p>
+
+          {/* QR Code Barcode Box Preview */}
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col sm:flex-row items-center gap-5">
+            <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-md shrink-0 text-center">
+              {shareQrDataUrl ? (
+                <img
+                  src={shareQrDataUrl}
+                  alt="QR Code Link Akses Tamu"
+                  className="w-40 h-40 object-contain mx-auto rounded-lg"
+                />
+              ) : (
+                <div className="w-40 h-40 flex items-center justify-center text-xs text-slate-400">
+                  Membuat Barcode...
+                </div>
+              )}
+              <span className="text-[10px] font-bold text-navy-900 mt-2 block tracking-wider uppercase">
+                Barcode Akses Tamu
+              </span>
+            </div>
+
+            <div className="space-y-3 flex-1 w-full text-center sm:text-left">
+              <div>
+                <h4 className="font-serif font-bold text-navy-950 text-base">
+                  Barcode Cetak Meja / Standee & Unduh PDF
+                </h4>
+                <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                  Cetak dan pajang di meja penerima tamu agar undangan dapat langsung memindai QR code ini dengan kamera HP untuk masuk ke buku tamu digital, mengirim ucapan doa, serta membagikan momen foto/video live ke layar proyektor.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-2 pt-1 justify-center sm:justify-start">
+                <button
+                  type="button"
+                  onClick={handlePrintBarcodePdf}
+                  className="px-4 py-2.5 bg-navy-950 hover:bg-navy-900 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md transition"
+                >
+                  <Printer className="w-4 h-4 text-gold-400" />
+                  <span>Unduh PDF / Cetak Barcode Standee</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadQrPng}
+                  className="px-3.5 py-2.5 bg-slate-200 hover:bg-slate-300 text-navy-950 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Unduh PNG</span>
+                </button>
+              </div>
+            </div>
+          </div>
 
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-2 overflow-hidden">
             <span className="text-xs font-mono text-navy-950 truncate">
