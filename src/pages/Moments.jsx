@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Camera, 
   Upload, 
@@ -8,15 +8,18 @@ import {
   Sparkles, 
   Image as ImageIcon, 
   Video, 
-  Share2,
-  Filter,
-  CheckCircle2,
-  AlertCircle
+  Share2, 
+  Filter, 
+  CheckCircle2, 
+  AlertCircle,
+  Smartphone,
+  FolderOpen
 } from 'lucide-react';
 import { INITIAL_MOMENTS } from '../services/mockData';
 import { getAllMoments, saveMoment, updateMomentLikes } from '../services/db';
 import { syncService } from '../services/syncService';
 import { getWeddingSettings } from '../services/weddingSettings';
+import { InAppCameraModal } from '../components/InAppCameraModal';
 
 export function Moments() {
   const [weddingSettings] = useState(getWeddingSettings());
@@ -24,6 +27,7 @@ export function Moments() {
   const [selectedCategory, setSelectedCategory] = useState('Semua');
   const [moments, setMoments] = useState(INITIAL_MOMENTS);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [lightboxMoment, setLightboxMoment] = useState(null);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
@@ -34,6 +38,11 @@ export function Moments() {
   const [previewMedia, setPreviewMedia] = useState(null);
   const [mediaFile, setMediaFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+
+  // Hidden native camera & gallery input refs
+  const nativePhotoInputRef = useRef(null);
+  const nativeVideoInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
 
   useEffect(() => {
     loadMoments();
@@ -81,7 +90,7 @@ export function Moments() {
   const handleLike = async (id, e) => {
     e.stopPropagation();
     try {
-      const updatedLikes = await updateMomentLikes(id, 1);
+      await updateMomentLikes(id, 1);
       setMoments((prev) =>
         prev.map((m) => (m.id === id ? { ...m, likes: (m.likes || 0) + 1 } : m))
       );
@@ -90,7 +99,17 @@ export function Moments() {
     }
   };
 
-  // Handle file select & preview
+  // Handle photo from in-app camera modal
+  const handleInAppPhotoCaptured = ({ file, previewUrl }) => {
+    setMediaFile(file);
+    setPreviewMedia({
+      url: previewUrl,
+      type: 'photo',
+    });
+    setIsUploadOpen(true);
+  };
+
+  // Handle file select from Native Camera or Gallery
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -102,15 +121,19 @@ export function Moments() {
         url: event.target.result,
         type: file.type.startsWith('video') ? 'video' : 'photo',
       });
+      setIsUploadOpen(true);
     };
     reader.readAsDataURL(file);
+
+    // Reset input value so same file can be re-selected if needed
+    e.target.value = '';
   };
 
   // Submit Upload
   const handleUploadSubmit = async (e) => {
     e.preventDefault();
     if (!previewMedia) {
-      alert('Pilih foto atau video terlebih dahulu!');
+      alert('Pilih atau jepret foto/video terlebih dahulu!');
       return;
     }
 
@@ -151,34 +174,80 @@ export function Moments() {
 
   return (
     <div className="space-y-6 pb-24 animate-fade-in">
-      {/* Header & Upload Button */}
+      {/* Hidden inputs for native camera & gallery picker */}
+      <input
+        type="file"
+        ref={nativePhotoInputRef}
+        accept="image/*"
+        capture="environment"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+      <input
+        type="file"
+        ref={nativeVideoInputRef}
+        accept="video/*"
+        capture="environment"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+      <input
+        type="file"
+        ref={galleryInputRef}
+        accept="image/*,video/*"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+
+      {/* In-App Live Camera Viewfinder Modal */}
+      <InAppCameraModal
+        isOpen={isCameraOpen}
+        onClose={() => setIsCameraOpen(false)}
+        onPhotoCaptured={handleInAppPhotoCaptured}
+      />
+
+      {/* Header & Main Camera Action Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="font-serif text-2xl sm:text-3xl font-bold text-gold-gradient">
+          <h2 className="font-serif text-2xl sm:text-3xl font-bold text-navy-950">
             Live Momen & Galeri
           </h2>
-          <p className="text-xs sm:text-sm text-slate-300">
-            Jepretan resmi fotografer dan kenangan selfie tamu pernikahan.
+          <p className="text-xs sm:text-sm text-slate-500">
+            Jepret foto langsung di aplikasi, kamera HP, atau unggah kenangan selfie Anda.
           </p>
         </div>
 
-        <button
-          onClick={() => setIsUploadOpen(true)}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-gold-600 via-gold-500 to-amber-400 hover:from-gold-500 hover:to-gold-300 text-navy-950 font-bold text-xs rounded-xl transition shadow-gold-glow active:scale-95"
-        >
-          <Camera className="w-4 h-4" />
-          <span>Bagikan Foto / Video Saya</span>
-        </button>
+        {/* Quick Camera Buttons */}
+        <div className="flex items-center gap-2">
+          {/* Button 1: In-App Camera */}
+          <button
+            onClick={() => setIsCameraOpen(true)}
+            className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 bg-navy-950 hover:bg-navy-900 text-white font-bold text-xs rounded-xl shadow-md transition active:scale-95"
+            title="Buka Kamera di Aplikasi"
+          >
+            <Camera className="w-4 h-4 text-gold-400" />
+            <span>Kamera Web</span>
+          </button>
+
+          {/* Button 2: Native Phone Camera / Upload Modal */}
+          <button
+            onClick={() => setIsUploadOpen(true)}
+            className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 bg-white hover:bg-slate-50 text-navy-950 border border-slate-300 font-bold text-xs rounded-xl shadow-sm transition active:scale-95"
+          >
+            <Smartphone className="w-4 h-4 text-navy-800" />
+            <span>Kamera HP / Upload</span>
+          </button>
+        </div>
       </div>
 
       {/* Tabs: Semua vs Fotografer vs Tamu */}
-      <div className="flex items-center gap-2 border-b border-white/10 pb-3 overflow-x-auto">
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-3 overflow-x-auto">
         <button
           onClick={() => setActiveTab('all')}
           className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition ${
             activeTab === 'all'
-              ? 'bg-gold-500 text-navy-950 shadow-gold-glow'
-              : 'bg-navy-900/80 text-slate-300 hover:bg-navy-800'
+              ? 'bg-navy-950 text-white shadow-sm'
+              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
           }`}
         >
           Semua Momen ({moments.length})
@@ -187,19 +256,19 @@ export function Moments() {
           onClick={() => setActiveTab('photographer')}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition ${
             activeTab === 'photographer'
-              ? 'bg-gold-500 text-navy-950 shadow-gold-glow'
-              : 'bg-navy-900/80 text-gold-300 hover:bg-navy-800 border border-gold-500/20'
+              ? 'bg-navy-950 text-white shadow-sm'
+              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
           }`}
         >
-          <Sparkles className="w-3.5 h-3.5" />
+          <Sparkles className="w-3.5 h-3.5 text-gold-500" />
           <span>Fotografer Resmi ({moments.filter((m) => m.uploaderRole === 'photographer').length})</span>
         </button>
         <button
           onClick={() => setActiveTab('guest')}
           className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition ${
             activeTab === 'guest'
-              ? 'bg-gold-500 text-navy-950 shadow-gold-glow'
-              : 'bg-navy-900/80 text-slate-300 hover:bg-navy-800'
+              ? 'bg-navy-950 text-white shadow-sm'
+              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
           }`}
         >
           Momen Tamu ({moments.filter((m) => m.uploaderRole === 'guest').length})
@@ -214,8 +283,8 @@ export function Moments() {
             onClick={() => setSelectedCategory(cat)}
             className={`px-2.5 py-1 rounded-lg text-[11px] whitespace-nowrap transition ${
               selectedCategory === cat
-                ? 'bg-gold-500/20 text-gold-300 border border-gold-500/50 font-semibold'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-navy-900 text-white font-semibold shadow-xs'
+                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
             }`}
           >
             {cat}
@@ -223,13 +292,13 @@ export function Moments() {
         ))}
       </div>
 
-      {/* Gallery Grid (Instagram / Pinterest style) */}
+      {/* Gallery Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3.5">
         {filteredMoments.map((item) => (
           <div
             key={item.id}
             onClick={() => setLightboxMoment(item)}
-            className="group relative rounded-2xl overflow-hidden glass-navy border border-gold-500/20 cursor-pointer shadow-lg hover:border-gold-500/50 transition duration-300 aspect-[4/5] flex flex-col justify-end"
+            className="group relative rounded-2xl overflow-hidden bg-white border border-slate-200/90 cursor-pointer shadow-sm hover:shadow-md hover:border-navy-300 transition duration-300 aspect-[4/5] flex flex-col justify-end"
           >
             {/* Image / Video preview */}
             <img
@@ -239,25 +308,25 @@ export function Moments() {
               loading="lazy"
             />
 
-            {/* Gradient Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-navy-950 via-navy-950/30 to-transparent opacity-90" />
+            {/* Gradient Overlay for high text readability */}
+            <div className="absolute inset-0 bg-gradient-to-t from-navy-950/90 via-navy-950/25 to-transparent" />
 
             {/* Top Badges */}
             <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between">
               {item.uploaderRole === 'photographer' ? (
-                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-navy-900/85 border border-gold-400/50 text-gold-300 text-[10px] font-semibold backdrop-blur-sm">
+                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-navy-950/90 border border-gold-400/50 text-gold-300 text-[10px] font-semibold backdrop-blur-sm">
                   <Sparkles className="w-3 h-3 text-gold-400" />
                   <span>Official</span>
                 </span>
               ) : (
-                <span className="px-2 py-0.5 rounded-full bg-navy-900/85 border border-white/10 text-slate-300 text-[10px] font-medium backdrop-blur-sm">
+                <span className="px-2 py-0.5 rounded-full bg-navy-950/85 border border-white/20 text-white text-[10px] font-medium backdrop-blur-sm">
                   Tamu
                 </span>
               )}
 
               {/* Offline indicator if not synced */}
               {!item.synced && (
-                <span className="px-2 py-0.5 rounded-full bg-amber-950/80 border border-amber-500/40 text-amber-300 text-[10px] font-semibold">
+                <span className="px-2 py-0.5 rounded-full bg-amber-500/90 text-white text-[10px] font-semibold">
                   Offline
                 </span>
               )}
@@ -265,22 +334,22 @@ export function Moments() {
 
             {/* Bottom Content Info */}
             <div className="relative p-3 space-y-1 z-10">
-              <p className="text-[11px] font-medium text-slate-100 line-clamp-2 leading-tight">
+              <p className="text-[11px] font-medium text-white line-clamp-2 leading-tight">
                 {item.caption}
               </p>
               
               <div className="flex items-center justify-between pt-1">
-                <span className="text-[10px] text-slate-400 font-medium truncate max-w-[100px]">
+                <span className="text-[10px] text-slate-300 font-medium truncate max-w-[100px]">
                   {item.uploaderName}
                 </span>
 
                 {/* Like Button */}
                 <button
                   onClick={(e) => handleLike(item.id, e)}
-                  className="flex items-center gap-1 px-2 py-1 rounded-full bg-navy-900/80 hover:bg-rose-950/60 border border-white/10 text-slate-300 hover:text-rose-400 transition"
+                  className="flex items-center gap-1 px-2 py-1 rounded-full bg-black/40 hover:bg-black/60 border border-white/10 text-white transition"
                 >
                   <Heart className="w-3 h-3 text-rose-400 fill-rose-400" />
-                  <span className="text-[10px] font-mono font-bold text-slate-200">
+                  <span className="text-[10px] font-mono font-bold text-white">
                     {item.likes || 0}
                   </span>
                 </button>
@@ -291,137 +360,204 @@ export function Moments() {
       </div>
 
       {filteredMoments.length === 0 && (
-        <div className="text-center py-16 glass-navy rounded-2xl border border-white/10">
-          <ImageIcon className="w-10 h-10 text-slate-500 mx-auto mb-2" />
-          <p className="text-sm font-semibold text-slate-300">Belum ada momen di kategori ini</p>
+        <div className="text-center py-16 bg-white rounded-2xl border border-slate-200 shadow-sm">
+          <ImageIcon className="w-10 h-10 text-slate-400 mx-auto mb-2" />
+          <p className="text-sm font-semibold text-navy-950">Belum ada momen di kategori ini</p>
           <p className="text-xs text-slate-500 mt-1">Jadilah orang pertama yang mengabadikan momen!</p>
         </div>
       )}
 
-      {/* MODAL UPLOAD MOMEN TAMU */}
+      {/* MODAL UPLOAD / PILIH KAMERA MOMEN TAMU */}
       {isUploadOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/85 backdrop-blur-md animate-fade-in">
-          <div className="relative w-full max-w-md bg-navy-900 border border-gold-500/40 rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-navy-950/70 backdrop-blur-md animate-fade-in">
+          <div className="relative w-full max-w-md bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto text-slate-900">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
-                <Camera className="w-5 h-5 text-gold-400" />
-                <h3 className="font-serif font-bold text-lg text-slate-100">Bagikan Momen</h3>
+                <Camera className="w-5 h-5 text-navy-900" />
+                <h3 className="font-serif font-bold text-lg text-navy-950">Bagikan Momen</h3>
               </div>
               <button
-                onClick={() => setIsUploadOpen(false)}
-                className="p-1.5 rounded-full bg-navy-800 text-slate-400 hover:text-white transition"
+                onClick={() => {
+                  setIsUploadOpen(false);
+                  setPreviewMedia(null);
+                  setMediaFile(null);
+                }}
+                className="p-1.5 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 transition"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleUploadSubmit} className="space-y-4">
-              {/* Media Picker / Preview */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Foto atau Video
-                </label>
-                {previewMedia ? (
-                  <div className="relative aspect-video rounded-xl overflow-hidden border border-gold-500/40 bg-navy-950">
-                    <img
-                      src={previewMedia.url}
-                      alt="Preview"
-                      className="w-full h-full object-contain"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setPreviewMedia(null)}
-                      className="absolute top-2 right-2 p-1 rounded-full bg-navy-950/80 text-white hover:bg-rose-600 transition"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
+            {/* Media Selector or Preview */}
+            {previewMedia ? (
+              <div className="relative aspect-video rounded-2xl overflow-hidden border border-navy-200 bg-slate-900 shadow-inner">
+                {previewMedia.type === 'video' ? (
+                  <video
+                    src={previewMedia.url}
+                    controls
+                    className="w-full h-full object-contain"
+                  />
                 ) : (
-                  <label className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gold-500/30 rounded-xl hover:border-gold-500/60 bg-navy-950/50 cursor-pointer transition">
-                    <Upload className="w-8 h-8 text-gold-400 mb-2" />
-                    <span className="text-xs font-semibold text-slate-200">
-                      Pilih dari Galeri atau Kamera HP
-                    </span>
-                    <span className="text-[10px] text-slate-400 mt-1">
-                      Mendukung Foto (JPG, PNG) & Video Pendek
-                    </span>
-                    <input
-                      type="file"
-                      accept="image/*,video/*"
-                      onChange={handleFileChange}
-                      className="hidden"
-                    />
-                  </label>
+                  <img
+                    src={previewMedia.url}
+                    alt="Preview"
+                    className="w-full h-full object-contain"
+                  />
                 )}
-              </div>
-
-              {/* Uploader Name */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Nama Anda
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={uploaderName}
-                  onChange={(e) => setUploaderName(e.target.value)}
-                  placeholder="Contoh: Rian & Nisa (Teman Kuliah)"
-                  className="w-full bg-navy-950 border border-gold-500/20 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-gold-400 transition"
-                />
-              </div>
-
-              {/* Category */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Kategori Momen
-                </label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full bg-navy-950 border border-gold-500/20 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-gold-400 transition"
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPreviewMedia(null);
+                    setMediaFile(null);
+                  }}
+                  className="absolute top-2 right-2 p-1.5 rounded-full bg-black/70 text-white hover:bg-rose-600 transition"
+                  title="Ganti Foto/Video"
                 >
-                  <option value="Selfie Tamu">Selfie Tamu</option>
-                  <option value="Akad Nikah">Akad Nikah</option>
-                  <option value="Resepsi">Resepsi</option>
-                  <option value="Dekorasi & Venue">Dekorasi & Venue</option>
-                  <option value="Detail Momen">Detail Momen</option>
-                </select>
+                  <X className="w-4 h-4" />
+                </button>
               </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-slate-700">Pilih Cara Mengambil Foto atau Video:</p>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {/* Option 1: In-App Web Camera */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsUploadOpen(false);
+                      setIsCameraOpen(true);
+                    }}
+                    className="p-3.5 rounded-2xl bg-navy-50 hover:bg-navy-100/80 border border-navy-200 flex items-center gap-3 text-left transition group"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-navy-950 text-white flex items-center justify-center shrink-0 group-hover:scale-105 transition">
+                      <Camera className="w-5 h-5 text-gold-400" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-navy-950">Kamera di Aplikasi</p>
+                      <p className="text-[10px] text-slate-500">Live viewfinder di web</p>
+                    </div>
+                  </button>
 
-              {/* Caption */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Caption / Pesan Singkat
-                </label>
-                <textarea
-                  rows={2}
-                  value={caption}
-                  onChange={(e) => setCaption(e.target.value)}
-                  placeholder="Tuliskan cerita singkat momen ini..."
-                  className="w-full bg-navy-950 border border-gold-500/20 rounded-xl px-3.5 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-gold-400 transition"
-                />
-              </div>
+                  {/* Option 2: Native Phone Camera (Photo) */}
+                  <button
+                    type="button"
+                    onClick={() => nativePhotoInputRef.current?.click()}
+                    className="p-3.5 rounded-2xl bg-navy-50 hover:bg-navy-100/80 border border-navy-200 flex items-center gap-3 text-left transition group"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-navy-900 text-white flex items-center justify-center shrink-0 group-hover:scale-105 transition">
+                      <Smartphone className="w-5 h-5 text-emerald-400" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-navy-950">Kamera Bawaan HP</p>
+                      <p className="text-[10px] text-slate-500">Buka kamera foto HP</p>
+                    </div>
+                  </button>
 
-              {/* Offline note */}
-              {!isOnline && (
-                <div className="p-3 bg-amber-950/60 border border-amber-500/40 rounded-xl flex items-center gap-2 text-xs text-amber-200">
-                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span>
-                    Anda sedang offline. Foto akan disimpan di HP dan terunggah otomatis saat sinyal kembali!
-                  </span>
+                  {/* Option 3: Native Phone Camera (Video) */}
+                  <button
+                    type="button"
+                    onClick={() => nativeVideoInputRef.current?.click()}
+                    className="p-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center gap-3 text-left transition group"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-navy-800 text-white flex items-center justify-center shrink-0 group-hover:scale-105 transition">
+                      <Video className="w-5 h-5 text-amber-300" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-navy-950">Rekam Video HP</p>
+                      <p className="text-[10px] text-slate-500">Rekam momen singkat</p>
+                    </div>
+                  </button>
+
+                  {/* Option 4: Gallery / File Picker */}
+                  <button
+                    type="button"
+                    onClick={() => galleryInputRef.current?.click()}
+                    className="p-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center gap-3 text-left transition group"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-slate-800 text-white flex items-center justify-center shrink-0 group-hover:scale-105 transition">
+                      <FolderOpen className="w-5 h-5 text-gold-300" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-navy-950">Galeri / Album</p>
+                      <p className="text-[10px] text-slate-500">Pilih file yang ada</p>
+                    </div>
+                  </button>
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* Submit */}
-              <button
-                type="submit"
-                disabled={isUploading}
-                className="w-full py-3 bg-gradient-to-r from-gold-600 via-gold-500 to-amber-400 hover:from-gold-500 hover:to-gold-300 text-navy-950 font-bold text-xs rounded-xl transition shadow-gold-glow flex items-center justify-center gap-2"
-              >
-                <Upload className="w-4 h-4" />
-                <span>{isUploading ? 'Menyimpan...' : 'Bagikan ke Galeri Bersama'}</span>
-              </button>
-            </form>
+            {/* Form details (only show when previewMedia is ready) */}
+            {previewMedia && (
+              <form onSubmit={handleUploadSubmit} className="space-y-4 pt-1">
+                {/* Uploader Name */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Nama Anda
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={uploaderName}
+                    onChange={(e) => setUploaderName(e.target.value)}
+                    placeholder="Contoh: Rian & Nisa (Teman Kuliah)"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-navy-600 focus:bg-white transition"
+                  />
+                </div>
+
+                {/* Category */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Kategori Momen
+                  </label>
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-navy-600 focus:bg-white transition"
+                  >
+                    <option value="Selfie Tamu">Selfie Tamu</option>
+                    <option value="Akad Nikah">Akad Nikah</option>
+                    <option value="Resepsi">Resepsi</option>
+                    <option value="Dekorasi & Venue">Dekorasi & Venue</option>
+                    <option value="Detail Momen">Detail Momen</option>
+                  </select>
+                </div>
+
+                {/* Caption */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Caption / Pesan Singkat
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={caption}
+                    onChange={(e) => setCaption(e.target.value)}
+                    placeholder="Tuliskan cerita singkat momen ini..."
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-navy-600 focus:bg-white transition"
+                  />
+                </div>
+
+                {/* Offline note */}
+                {!isOnline && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-2 text-xs text-amber-800">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>
+                      Anda sedang offline. Foto akan disimpan di HP dan terunggah otomatis saat sinyal kembali!
+                    </span>
+                  </div>
+                )}
+
+                {/* Submit */}
+                <button
+                  type="submit"
+                  disabled={isUploading}
+                  className="w-full py-3 bg-gradient-to-r from-navy-950 via-navy-900 to-navy-950 hover:brightness-110 text-white font-bold text-xs rounded-xl transition shadow-md flex items-center justify-center gap-2"
+                >
+                  <Upload className="w-4 h-4" />
+                  <span>{isUploading ? 'Menyimpan...' : 'Bagikan ke Galeri Bersama'}</span>
+                </button>
+              </form>
+            )}
           </div>
         </div>
       )}
@@ -431,7 +567,7 @@ export function Moments() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-950/95 backdrop-blur-xl p-2 sm:p-6 animate-fade-in">
           <button
             onClick={() => setLightboxMoment(null)}
-            className="absolute top-4 right-4 z-50 p-2.5 rounded-full bg-navy-900/80 text-slate-300 hover:text-white border border-white/20 transition"
+            className="absolute top-4 right-4 z-50 p-2.5 rounded-full bg-navy-900/80 text-white hover:bg-navy-800 border border-white/20 transition"
           >
             <X className="w-6 h-6" />
           </button>
@@ -440,16 +576,16 @@ export function Moments() {
             <img
               src={lightboxMoment.previewUrl}
               alt={lightboxMoment.caption}
-              className="max-h-[75vh] w-auto object-contain rounded-2xl shadow-2xl border border-gold-500/30"
+              className="max-h-[75vh] w-auto object-contain rounded-2xl shadow-2xl border border-navy-700"
             />
 
-            <div className="w-full max-w-xl mt-4 glass-navy p-4 rounded-2xl border border-white/10 flex items-center justify-between gap-4">
+            <div className="w-full max-w-xl mt-4 bg-white p-4 rounded-2xl border border-slate-200 flex items-center justify-between gap-4 shadow-xl">
               <div>
-                <p className="text-xs sm:text-sm font-semibold text-slate-100">
+                <p className="text-xs sm:text-sm font-semibold text-navy-950">
                   {lightboxMoment.caption}
                 </p>
-                <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
-                  <span className="text-gold-400 font-medium">{lightboxMoment.uploaderName}</span>
+                <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
+                  <span className="text-navy-800 font-bold">{lightboxMoment.uploaderName}</span>
                   <span>•</span>
                   <span>{new Date(lightboxMoment.timestamp).toLocaleTimeString('id-ID')}</span>
                 </div>
@@ -458,10 +594,10 @@ export function Moments() {
               <div className="flex items-center gap-2 shrink-0">
                 <a
                   href={lightboxMoment.previewUrl}
-                  download="HeMa_Wedding_Moment.jpg"
+                  download="Wedding_Moment.jpg"
                   target="_blank"
                   rel="noreferrer"
-                  className="p-2 rounded-xl bg-navy-800 hover:bg-navy-700 text-gold-400 border border-gold-500/30 transition"
+                  className="p-2 rounded-xl bg-navy-950 hover:bg-navy-900 text-white transition shadow-sm"
                   title="Unduh Foto Resolusi Asli"
                 >
                   <Download className="w-5 h-5" />

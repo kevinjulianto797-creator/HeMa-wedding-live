@@ -100,7 +100,7 @@ export function LiveScreen({ setActivePage }) {
 
   const currentPhoto = moments[currentSlideIndex] || {
     previewUrl: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1600&q=85',
-    caption: `The Wedding Celebration of ${settings.coupleTitle || 'Hendra & Maya'}`,
+    caption: `The Wedding Celebration of ${settings.coupleTitle || 'Cecep & Memey'}`,
     uploaderName: 'Official Lens Art',
     category: 'Akad Nikah',
   };
@@ -121,7 +121,7 @@ export function LiveScreen({ setActivePage }) {
 
           <div>
             <h1 className="font-serif text-xl sm:text-2xl font-bold text-gold-gradient">
-              {settings.coupleTitle || 'Hendra & Maya'}
+              {settings.coupleTitle || 'Cecep & Memey'}
             </h1>
             <p className="text-[11px] text-slate-300 font-medium tracking-wider uppercase">
               {settings.venueName || 'Grand Ballroom Hotel Mulia'} • {currentTime} WIB
@@ -190,7 +190,7 @@ export function LiveScreen({ setActivePage }) {
               <Sparkles className="w-8 h-8" />
             </div>
             <h2 className="font-serif text-3xl sm:text-4xl font-bold text-gold-gradient">
-              {settings.coupleTitle || 'Hendra & Maya'}
+              {settings.coupleTitle || 'Cecep & Memey'}
             </h2>
             <p className="text-xs sm:text-sm text-slate-300">
               Layar proyektor live panggung. Foto dari fotografer dan selfie tamu akan langsung tayang di sini secara realtime.

@@ -87,7 +87,7 @@ export function CheckIn() {
       particleCount: 80,
       spread: 70,
       origin: { y: 0.6 },
-      colors: ['#D4AF37', '#FDE68A', '#102A43', '#FFFFFF']
+      colors: ['#0A192F', '#1E3A8A', '#D4AF37', '#10B981']
     });
   };
 
@@ -147,21 +147,21 @@ export function CheckIn() {
     <div className="space-y-6 pb-24 animate-fade-in">
       {/* Title & Tabs */}
       <div className="text-center space-y-2">
-        <h2 className="font-serif text-2xl sm:text-3xl font-bold text-gold-gradient">
+        <h2 className="font-serif text-2xl sm:text-3xl font-bold text-navy-950">
           Check-in Kehadiran Tamu
         </h2>
-        <p className="text-xs sm:text-sm text-slate-300">
+        <p className="text-xs sm:text-sm text-slate-500">
           Sistem absensi barcode cerdas dengan dukungan mode online dan offline.
         </p>
 
         {/* Tab Selector */}
-        <div className="inline-flex p-1 bg-navy-900 border border-gold-500/30 rounded-2xl mt-2">
+        <div className="inline-flex p-1 bg-slate-100 border border-slate-200 rounded-2xl mt-2">
           <button
             onClick={() => setActiveTab('receptionist')}
             className={`px-4 py-2 rounded-xl text-xs font-semibold transition ${
               activeTab === 'receptionist'
-                ? 'bg-gradient-to-r from-gold-600 to-gold-500 text-navy-950 shadow-gold-glow'
-                : 'text-slate-300 hover:text-white'
+                ? 'bg-navy-950 text-white shadow-xs font-bold'
+                : 'text-slate-600 hover:text-navy-900'
             }`}
           >
             Mode 1: Panitia / Resepsionis
@@ -170,8 +170,8 @@ export function CheckIn() {
             onClick={() => setActiveTab('self')}
             className={`px-4 py-2 rounded-xl text-xs font-semibold transition ${
               activeTab === 'self'
-                ? 'bg-gradient-to-r from-gold-600 to-gold-500 text-navy-950 shadow-gold-glow'
-                : 'text-slate-300 hover:text-white'
+                ? 'bg-navy-950 text-white shadow-xs font-bold'
+                : 'text-slate-600 hover:text-navy-900'
             }`}
           >
             Mode 2: Tamu Mandiri
@@ -181,17 +181,17 @@ export function CheckIn() {
 
       {/* Attendance Stats Cards */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="glass-navy p-3.5 rounded-2xl text-center border border-white/10">
-          <span className="text-[11px] text-slate-400">Total Tamu</span>
-          <p className="text-lg sm:text-2xl font-bold font-mono text-slate-100">{totalGuests}</p>
+        <div className="bg-white p-3.5 rounded-2xl text-center border border-slate-200 shadow-sm">
+          <span className="text-[11px] text-slate-500 font-medium">Total Tamu</span>
+          <p className="text-lg sm:text-2xl font-bold font-mono text-navy-950">{totalGuests}</p>
         </div>
-        <div className="glass-navy p-3.5 rounded-2xl text-center border border-emerald-500/30 bg-emerald-950/20">
-          <span className="text-[11px] text-emerald-400">Sudah Hadir</span>
-          <p className="text-lg sm:text-2xl font-bold font-mono text-emerald-400">{arrivedCount}</p>
+        <div className="bg-emerald-50 p-3.5 rounded-2xl text-center border border-emerald-200">
+          <span className="text-[11px] text-emerald-700 font-semibold">Sudah Hadir</span>
+          <p className="text-lg sm:text-2xl font-bold font-mono text-emerald-800">{arrivedCount}</p>
         </div>
-        <div className="glass-navy p-3.5 rounded-2xl text-center border border-amber-500/30 bg-amber-950/20">
-          <span className="text-[11px] text-amber-300">Belum Hadir</span>
-          <p className="text-lg sm:text-2xl font-bold font-mono text-amber-300">
+        <div className="bg-amber-50 p-3.5 rounded-2xl text-center border border-amber-200">
+          <span className="text-[11px] text-amber-700 font-semibold">Belum Hadir</span>
+          <p className="text-lg sm:text-2xl font-bold font-mono text-amber-800">
             {totalGuests - arrivedCount}
           </p>
         </div>
@@ -201,34 +201,34 @@ export function CheckIn() {
       {activeTab === 'receptionist' && (
         <div className="space-y-4">
           {/* Main Action: Open Camera Scanner */}
-          <div className="glass-navy p-5 rounded-2xl border border-gold-500/40 text-center space-y-4 shadow-navy-card">
-            <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-gold-600 via-gold-500 to-amber-300 text-navy-950 flex items-center justify-center shadow-gold-glow">
-              <Camera className="w-7 h-7" />
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 text-center space-y-4 shadow-sm">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-navy-950 text-white flex items-center justify-center shadow-md">
+              <Camera className="w-7 h-7 text-gold-400" />
             </div>
             <div>
-              <h3 className="font-serif font-bold text-lg text-slate-100">
+              <h3 className="font-serif font-bold text-lg text-navy-950">
                 Scan Barcode / QR Undangan Tamu
               </h3>
-              <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
+              <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
                 Arahkan kamera HP panitia ke QR code pada kartu fisik atau layar HP tamu untuk absensi otomatis.
               </p>
             </div>
             <button
               onClick={() => setIsScannerOpen(true)}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-gold-600 via-gold-500 to-amber-400 hover:from-gold-500 hover:to-gold-300 text-navy-950 font-bold text-sm rounded-xl transition shadow-gold-glow active:scale-95"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-navy-950 via-navy-900 to-navy-950 hover:brightness-110 text-white font-bold text-sm rounded-xl transition shadow-md active:scale-95"
             >
-              <QrCode className="w-5 h-5" />
+              <QrCode className="w-5 h-5 text-gold-400" />
               <span>Buka Kamera Scanner</span>
             </button>
           </div>
 
           {/* Fallback Search Input */}
-          <div className="glass-navy p-4 rounded-2xl border border-white/10 space-y-3">
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="text-xs font-semibold text-gold-400 uppercase tracking-wider">
+              <h4 className="text-xs font-semibold text-navy-900 uppercase tracking-wider">
                 Atau Cari Nama Tamu (Manual)
               </h4>
-              <span className="text-[11px] text-slate-400">
+              <span className="text-[11px] text-slate-500 font-mono">
                 {filteredGuests.length} ditemukan
               </span>
             </div>
@@ -240,12 +240,12 @@ export function CheckIn() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Ketik nama tamu / kategori / meja..."
-                className="w-full bg-navy-950 border border-gold-500/20 rounded-xl pl-9 pr-4 py-2.5 text-xs sm:text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-gold-400 transition"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2.5 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-navy-600 focus:bg-white transition"
               />
             </div>
 
             {/* Guest List Items */}
-            <div className="divide-y divide-white/5 max-h-96 overflow-y-auto pr-1">
+            <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto pr-1">
               {filteredGuests.map((guest) => (
                 <div
                   key={guest.id}
@@ -253,18 +253,18 @@ export function CheckIn() {
                 >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <p className="font-semibold text-xs sm:text-sm text-slate-100">
+                      <p className="font-semibold text-xs sm:text-sm text-navy-950">
                         {guest.name}
                       </p>
                       {guest.checkedIn && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-[10px] font-semibold">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-semibold">
                           <CheckCircle2 className="w-3 h-3" />
                           <span>Hadir</span>
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 text-[11px] text-slate-400">
-                      <span className="text-gold-300 font-medium">{guest.category}</span>
+                    <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                      <span className="text-navy-700 font-medium">{guest.category}</span>
                       <span>•</span>
                       <span>{guest.table}</span>
                       <span>•</span>
@@ -284,7 +284,7 @@ export function CheckIn() {
                         })
                       }
                       title="Lihat QR Code Tiket"
-                      className="p-2 rounded-lg bg-navy-800 hover:bg-navy-700 text-gold-400 border border-gold-500/20 transition"
+                      className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-navy-900 border border-slate-200 transition"
                     >
                       <QrCode className="w-4 h-4" />
                     </button>
@@ -293,12 +293,12 @@ export function CheckIn() {
                     {!guest.checkedIn ? (
                       <button
                         onClick={() => handleCheckInGuest(guest, 'manual')}
-                        className="px-3 py-1.5 bg-gold-500/20 hover:bg-gold-500/30 text-gold-300 border border-gold-500/40 rounded-lg text-xs font-semibold transition"
+                        className="px-3 py-1.5 bg-navy-950 hover:bg-navy-900 text-white rounded-lg text-xs font-semibold transition shadow-xs"
                       >
                         Tandai Hadir
                       </button>
                     ) : (
-                      <span className="text-[11px] text-slate-400 font-mono">
+                      <span className="text-[11px] text-slate-500 font-mono">
                         {guest.checkedInAt
                           ? new Date(guest.checkedInAt).toLocaleTimeString('id-ID', {
                               hour: '2-digit',
@@ -318,31 +318,31 @@ export function CheckIn() {
       {/* MODE 2: TAMU MANDIRI (SELF CHECK-IN) */}
       {activeTab === 'self' && (
         <div className="space-y-4">
-          <div className="glass-navy p-6 rounded-2xl border border-gold-500/40 text-center space-y-4 shadow-navy-card">
-            <div className="w-14 h-14 mx-auto rounded-2xl bg-gold-500/10 border border-gold-500/30 text-gold-400 flex items-center justify-center">
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 text-center space-y-4 shadow-sm">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-navy-50 text-navy-900 border border-navy-200 flex items-center justify-center">
               <QrCode className="w-7 h-7" />
             </div>
             <div>
-              <h3 className="font-serif font-bold text-lg text-slate-100">
+              <h3 className="font-serif font-bold text-lg text-navy-950">
                 Self Check-in Tamu
               </h3>
-              <p className="text-xs text-slate-300 max-w-sm mx-auto mt-1">
+              <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
                 Scan standee akrilik di meja resepsionis atau pilih nama Anda sendiri di bawah untuk konfirmasi kehadiran.
               </p>
             </div>
 
             <button
               onClick={() => setIsScannerOpen(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-gold-600 to-gold-500 hover:from-gold-500 hover:to-gold-400 text-navy-950 font-bold text-xs rounded-xl transition shadow-gold-glow"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-navy-950 to-navy-900 text-white font-bold text-xs rounded-xl transition shadow-md"
             >
-              <Camera className="w-4 h-4" />
+              <Camera className="w-4 h-4 text-gold-400" />
               <span>Scan QR Meja Resepsionis</span>
             </button>
           </div>
 
           {/* Quick Select My Name */}
-          <div className="glass-navy p-5 rounded-2xl border border-white/10 space-y-3">
-            <h4 className="text-xs font-semibold text-gold-400 uppercase tracking-wider">
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+            <h4 className="text-xs font-semibold text-navy-900 uppercase tracking-wider">
               Konfirmasi Mandiri dengan Nama Anda
             </h4>
             <div className="relative">
@@ -352,27 +352,27 @@ export function CheckIn() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Cari nama Anda di undangan..."
-                className="w-full bg-navy-950 border border-gold-500/20 rounded-xl pl-9 pr-4 py-2.5 text-xs sm:text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-gold-400 transition"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2.5 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-navy-600 focus:bg-white transition"
               />
             </div>
 
-            <div className="divide-y divide-white/5 max-h-64 overflow-y-auto">
+            <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
               {filteredGuests.map((guest) => (
                 <div key={guest.id} className="py-2.5 flex items-center justify-between">
                   <div>
-                    <p className="font-semibold text-xs text-slate-200">{guest.name}</p>
-                    <p className="text-[10px] text-slate-400">{guest.table}</p>
+                    <p className="font-semibold text-xs text-navy-950">{guest.name}</p>
+                    <p className="text-[10px] text-slate-500">{guest.table}</p>
                   </div>
                   {!guest.checkedIn ? (
                     <button
                       onClick={() => handleCheckInGuest(guest, 'self')}
-                      className="px-3 py-1 bg-gold-500 text-navy-950 font-bold text-xs rounded-lg hover:bg-gold-400 transition"
+                      className="px-3 py-1 bg-navy-950 hover:bg-navy-900 text-white font-bold text-xs rounded-lg transition shadow-xs"
                     >
                       Saya Hadir!
                     </button>
                   ) : (
-                    <span className="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                       <span>Sudah Hadir</span>
                     </span>
                   )}
@@ -385,42 +385,42 @@ export function CheckIn() {
 
       {/* Success Modal Confirmation */}
       {successGuest && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/85 backdrop-blur-md animate-fade-in">
-          <div className="relative w-full max-w-sm bg-navy-900 border border-gold-500/50 rounded-3xl p-6 shadow-2xl text-center space-y-4">
-            <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center text-emerald-400">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/70 backdrop-blur-md animate-fade-in">
+          <div className="relative w-full max-w-sm bg-white border border-slate-200 rounded-3xl p-6 shadow-2xl text-center space-y-4">
+            <div className="w-16 h-16 mx-auto rounded-full bg-emerald-50 border-2 border-emerald-400 flex items-center justify-center text-emerald-600">
               <CheckCircle2 className="w-10 h-10" />
             </div>
 
             <div>
-              <span className="text-xs uppercase tracking-widest text-gold-400 font-semibold">
+              <span className="text-xs uppercase tracking-widest text-navy-800 font-bold">
                 Check-in Berhasil!
               </span>
-              <h3 className="font-serif font-bold text-xl text-slate-100 mt-1">
+              <h3 className="font-serif font-bold text-xl text-slate-700 mt-1">
                 Selamat Datang,
               </h3>
-              <p className="font-serif font-bold text-2xl text-gold-gradient mt-0.5">
+              <p className="font-serif font-bold text-2xl text-navy-950 mt-0.5">
                 {successGuest.name}
               </p>
             </div>
 
-            <div className="bg-navy-950 p-3.5 rounded-xl border border-white/10 text-xs text-slate-300 space-y-1.5">
+            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs text-slate-700 space-y-1.5">
               <div className="flex justify-between">
-                <span className="text-slate-400">Kategori:</span>
-                <span className="font-semibold text-gold-300">{successGuest.category}</span>
+                <span className="text-slate-500">Kategori:</span>
+                <span className="font-semibold text-navy-950">{successGuest.category}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Meja Tamu:</span>
-                <span className="font-semibold text-slate-100">{successGuest.table}</span>
+                <span className="text-slate-500">Meja Tamu:</span>
+                <span className="font-semibold text-navy-950">{successGuest.table}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Waktu Hadir:</span>
-                <span className="font-mono text-slate-100">
+                <span className="text-slate-500">Waktu Hadir:</span>
+                <span className="font-mono text-navy-950">
                   {new Date(successGuest.checkedInAt).toLocaleTimeString('id-ID')}
                 </span>
               </div>
-              <div className="flex justify-between pt-1 border-t border-white/5">
-                <span className="text-slate-400">Status Sinyal:</span>
-                <span className={`font-semibold ${isOnline ? 'text-emerald-400' : 'text-amber-300'}`}>
+              <div className="flex justify-between pt-1 border-t border-slate-200">
+                <span className="text-slate-500">Status Sinyal:</span>
+                <span className={`font-semibold ${isOnline ? 'text-emerald-700' : 'text-amber-700'}`}>
                   {isOnline ? 'Tersinkronisasi Online' : 'Tersimpan di Perangkat (Offline)'}
                 </span>
               </div>
@@ -428,7 +428,7 @@ export function CheckIn() {
 
             <button
               onClick={() => setSuccessGuest(null)}
-              className="w-full py-3 bg-gradient-to-r from-gold-600 to-gold-500 hover:from-gold-500 hover:to-gold-400 text-navy-950 font-bold text-xs rounded-xl transition shadow-gold-glow"
+              className="w-full py-3 bg-navy-950 hover:bg-navy-900 text-white font-bold text-xs rounded-xl transition shadow-md"
             >
               Tutup & Lanjutkan
             </button>

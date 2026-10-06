@@ -49,7 +49,7 @@ export function App() {
   }
 
   return (
-    <div className="min-h-screen bg-navy-950 text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
       {/* Offline Alert Strip if network drops */}
       {!isOnline && (
         <aside aria-label="Status Jaringan" className="bg-amber-600/90 text-navy-950 px-4 py-2 text-xs font-semibold flex items-center justify-between shadow-md">

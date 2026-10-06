@@ -10,7 +10,7 @@ export function BottomNav({ activePage, setActivePage }) {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 glass-navy border-t border-gold-500/20 backdrop-blur-xl sm:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 border-t border-slate-200 backdrop-blur-xl shadow-lg sm:hidden">
       <div className="flex items-center justify-around px-4 py-2">
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -24,17 +24,17 @@ export function BottomNav({ activePage, setActivePage }) {
                 className="flex flex-col items-center -mt-5 group"
               >
                 <div
-                  className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform ${
+                  className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md transition-transform ${
                     isActive
-                      ? 'bg-gradient-to-r from-gold-500 to-amber-400 text-navy-950 scale-110 shadow-gold-glow'
-                      : 'bg-navy-800 border-2 border-gold-400 text-gold-300 hover:scale-105'
+                      ? 'bg-navy-950 text-white scale-110 shadow-navy-glow ring-2 ring-gold-400'
+                      : 'bg-navy-900 text-white hover:scale-105'
                   }`}
                 >
                   <Icon className="w-6 h-6" />
                 </div>
                 <span
                   className={`text-[10px] mt-1 font-semibold ${
-                    isActive ? 'text-gold-400' : 'text-slate-300'
+                    isActive ? 'text-navy-950' : 'text-slate-500'
                   }`}
                 >
                   {item.label}
@@ -49,8 +49,8 @@ export function BottomNav({ activePage, setActivePage }) {
               onClick={() => setActivePage(item.id)}
               className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${
                 isActive
-                  ? 'text-gold-400 font-semibold'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'text-navy-950 font-bold'
+                  : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               <Icon className={`w-5 h-5 mb-0.5 ${isActive ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />

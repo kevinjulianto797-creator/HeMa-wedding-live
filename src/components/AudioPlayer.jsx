@@ -67,7 +67,7 @@ export function AudioPlayer({ audioBlob, audioDuration = 15, isDemo = false }) {
   const progressPercent = audioDuration > 0 ? (currentTime / audioDuration) * 100 : 0;
 
   return (
-    <div className="bg-navy-950/70 border border-gold-500/20 rounded-xl p-2.5 flex items-center gap-3">
+    <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 flex items-center gap-3">
       {audioUrl && (
         <audio
           ref={audioRef}
@@ -81,31 +81,31 @@ export function AudioPlayer({ audioBlob, audioDuration = 15, isDemo = false }) {
       {/* Play/Pause Button */}
       <button
         onClick={togglePlay}
-        className="w-8 h-8 rounded-full bg-gold-500 hover:bg-gold-400 text-navy-950 flex items-center justify-center shrink-0 transition shadow-gold-glow"
+        className="w-8 h-8 rounded-full bg-navy-950 hover:bg-navy-900 text-white flex items-center justify-center shrink-0 transition shadow-sm"
       >
         {isPlaying ? (
-          <Pause className="w-4 h-4 fill-navy-950" />
+          <Pause className="w-4 h-4 fill-white" />
         ) : (
-          <Play className="w-4 h-4 fill-navy-950 ml-0.5" />
+          <Play className="w-4 h-4 fill-white ml-0.5" />
         )}
       </button>
 
       {/* Waveform / Progress Track */}
       <div className="flex-1">
-        <div className="flex items-center justify-between text-[10px] text-gold-300 font-mono mb-1">
-          <div className="flex items-center gap-1">
-            <Volume2 className="w-3 h-3 text-gold-400" />
+        <div className="flex items-center justify-between text-[10px] text-navy-800 font-mono mb-1">
+          <div className="flex items-center gap-1 font-semibold">
+            <Volume2 className="w-3 h-3 text-navy-700" />
             <span>Voice Note</span>
           </div>
-          <span>
+          <span className="text-slate-500">
             {formatSecs(currentTime)} / {formatSecs(audioDuration)}
           </span>
         </div>
 
         {/* Progress Bar with Mini Waveform spikes */}
-        <div className="relative w-full h-2 bg-navy-800 rounded-full overflow-hidden">
+        <div className="relative w-full h-2 bg-slate-200 rounded-full overflow-hidden">
           <div
-            className="absolute top-0 bottom-0 left-0 bg-gradient-to-r from-gold-600 to-amber-300 transition-all duration-300"
+            className="absolute top-0 bottom-0 left-0 bg-navy-900 transition-all duration-300"
             style={{ width: `${Math.min(100, Math.max(0, progressPercent))}%` }}
           />
         </div>

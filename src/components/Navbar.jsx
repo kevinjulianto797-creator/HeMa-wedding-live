@@ -75,7 +75,7 @@ export function Navbar({ activePage, setActivePage }) {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full glass-navy border-b border-gold-500/20 backdrop-blur-md">
+    <header className="sticky top-0 z-40 w-full bg-white/95 border-b border-navy-100/80 backdrop-blur-md shadow-sm">
       <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center justify-between">
         {/* Brand & Couple Names (Secret Admin trigger on 5 taps) */}
         <div 
@@ -83,18 +83,18 @@ export function Navbar({ activePage, setActivePage }) {
           className="flex items-center gap-2.5 cursor-pointer group select-none"
           title="Klik untuk Beranda"
         >
-          <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-gold-600 via-gold-400 to-amber-200 p-[1.5px] shadow-gold-glow">
-            <div className="w-full h-full rounded-full bg-navy-900 flex items-center justify-center">
-              <span className="font-serif text-sm font-bold text-gold-400">
-                {settings.initials || 'HM'}
+          <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-navy-900 via-navy-800 to-gold-500 p-[1.5px] shadow-sm">
+            <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
+              <span className="font-serif text-sm font-bold text-navy-900">
+                {settings.initials || 'CM'}
               </span>
             </div>
           </div>
           <div>
-            <h1 className="font-serif text-base sm:text-lg font-bold tracking-wide text-gold-gradient group-hover:opacity-90 transition">
-              {settings.coupleTitle || 'Hendra & Maya'}
+            <h1 className="font-serif text-base sm:text-lg font-bold tracking-wide text-navy-950 group-hover:text-navy-700 transition">
+              {settings.coupleTitle || 'Cecep & Memey'}
             </h1>
-            <p className="text-[10px] text-slate-300 font-medium tracking-wider uppercase">
+            <p className="text-[10px] text-slate-500 font-medium tracking-wider uppercase">
               {settings.weddingDateFormatted || 'Minggu, 18 Okt 2026'} • Live
             </p>
           </div>
@@ -108,7 +108,7 @@ export function Navbar({ activePage, setActivePage }) {
               onClick={handleManualSync}
               disabled={networkStatus.isSyncing || !networkStatus.isOnline}
               title="Ada data offline yang menunggu sinyal"
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition animate-pulse"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition animate-pulse"
             >
               <RefreshCw className={`w-3 h-3 ${networkStatus.isSyncing ? 'animate-spin' : ''}`} />
               <span>{pendingCount} Antrean</span>
@@ -119,13 +119,13 @@ export function Navbar({ activePage, setActivePage }) {
           <div
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border ${
               networkStatus.isOnline
-                ? 'bg-emerald-950/60 text-emerald-400 border-emerald-500/30'
-                : 'bg-rose-950/60 text-rose-300 border-rose-500/40'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : 'bg-rose-50 text-rose-700 border-rose-200'
             }`}
           >
             <span
               className={`w-2 h-2 rounded-full ${
-                networkStatus.isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'
+                networkStatus.isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'
               }`}
             />
             <span className="hidden sm:inline">

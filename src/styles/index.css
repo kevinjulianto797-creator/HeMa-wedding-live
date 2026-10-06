@@ -4,18 +4,18 @@
 
 @layer base {
   body {
-    @apply bg-navy-950 text-slate-100 font-sans antialiased overflow-x-hidden;
+    @apply bg-slate-50 text-slate-800 font-sans antialiased overflow-x-hidden;
   }
 }
 
-/* Custom Wedding Scrollbar */
+/* Custom Wedding Scrollbar (Navy on Light) */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0A192F;
+  background: #F1F5F9;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -24,49 +24,64 @@
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #D4AF37;
+  background: #0A192F;
 }
 
-/* Glassmorphism Styles */
+/* Glassmorphism Styles (Crisp White Card with Deep Navy Accents & Soft Shadow) */
 .glass-navy {
-  background: rgba(13, 33, 58, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(212, 175, 55, 0.15);
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(16, 42, 67, 0.12);
+  box-shadow: 0 4px 20px -2px rgba(10, 25, 47, 0.05);
 }
 
 .glass-navy-subtle {
-  background: rgba(16, 42, 67, 0.5);
+  background: rgba(255, 255, 255, 0.88);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(16, 42, 67, 0.08);
+  box-shadow: 0 2px 10px -1px rgba(10, 25, 47, 0.03);
 }
 
 .glass-gold {
-  background: rgba(212, 175, 55, 0.1);
+  background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(212, 175, 55, 0.35);
+  box-shadow: 0 4px 15px -2px rgba(212, 175, 55, 0.12);
 }
 
-/* Gold Gradient Text */
+/* Navy Gradient Text */
+.text-navy-gradient {
+  background: linear-gradient(135deg, #0A192F 0%, #102A43 45%, #1E3A8A 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Gold Gradient Text (Darkened slightly for high readability on white) */
 .text-gold-gradient {
-  background: linear-gradient(135deg, #FDE68A 0%, #D4AF37 50%, #B8860B 100%);
+  background: linear-gradient(135deg, #0A192F 0%, #1E3A8A 60%, #B8860B 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 /* Gold Border Glow */
 .border-gold-glow {
-  border: 1px solid rgba(212, 175, 55, 0.4);
+  border: 1px solid rgba(212, 175, 55, 0.5);
   box-shadow: 0 0 15px rgba(212, 175, 55, 0.15);
+}
+
+/* Navy Shadow Glow */
+.shadow-navy-glow {
+  box-shadow: 0 8px 25px -4px rgba(10, 25, 47, 0.15);
 }
 
 /* Pulse Animation for Live Indicators */
 @keyframes goldPulse {
   0%, 100% {
     transform: scale(1);
-    opacity: 0.8;
+    opacity: 0.85;
   }
   50% {
     transform: scale(1.15);
