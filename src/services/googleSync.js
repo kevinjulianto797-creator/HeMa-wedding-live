@@ -245,3 +245,27 @@ export async function pullCloudData() {
     return null;
   }
 }
+
+// 6. Test Koneksi Webhook Google Spreadsheet
+export async function testGoogleConnection(url) {
+  const settings = getGoogleSettings();
+  const targetUrl = url || settings.sheetsWebhookUrl;
+  if (!targetUrl || !targetUrl.startsWith('http')) {
+    throw new Error('URL Webhook Google Apps Script belum diisi.');
+  }
+
+  const payload = {
+    action: 'TEST_CONNECTION',
+    timestamp: new Date().toISOString(),
+  };
+
+  await fetch(targetUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload),
+    mode: 'no-cors',
+  });
+
+  addAuditLog('TEST', 'Tes pengiriman baris ke Google Sheets berhasil dikirim!');
+  return { success: true };
+}

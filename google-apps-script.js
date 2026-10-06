@@ -122,20 +122,42 @@ function setupDatabase() {
 // 3. Webhook Receiver (doPost) dari Frontend PWA
 function doPost(e) {
   try {
-    var rawData = e.postData.contents;
-    var data = JSON.parse(rawData);
+    var data = {};
+    if (e && e.postData && e.postData.contents) {
+      try {
+        data = JSON.parse(e.postData.contents);
+      } catch (errJson) {
+        data = e.parameter || {};
+      }
+    } else if (e && e.parameter) {
+      data = e.parameter;
+    }
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var props = PropertiesService.getScriptProperties();
+
+    // 0. ACTION: TEST KONEKSI
+    if (data.action === "TEST_CONNECTION") {
+      var sheetHadirTest = getOrCreateSheetWithHeaders(ss, "Kehadiran", [["Timestamp", "ID Tamu", "Nama Tamu", "Kategori", "Pax", "Meja", "Metode Checkin"]]);
+      sheetHadirTest.appendRow([
+        new Date(),
+        "TEST",
+        "TES KONEKSI BERHASIL: Sistem terhubung ke Google Sheets!",
+        "Tes Otomatis",
+        1,
+        "-",
+        "Admin Web Test"
+      ]);
+      return sendJsonResponse({ status: "success", message: "Koneksi berhasil dan baris tes tercatat di Spreadsheet!" });
+    }
 
     // A. ACTION: CHECK-IN TAMU
     if (data.action === "CHECK_IN") {
-      var sheetHadir = ss.getSheetByName("Kehadiran");
-      if (!sheetHadir) sheetHadir = getOrCreateSheet(ss, "Kehadiran");
+      var sheetHadir = getOrCreateSheetWithHeaders(ss, "Kehadiran", [["Timestamp", "ID Tamu", "Nama Tamu", "Kategori", "Pax", "Meja", "Metode Checkin"]]);
 
       sheetHadir.appendRow([
         new Date(data.timestamp || new Date()),
         data.guestId || "-",
-        data.guestName,
+        data.guestName || "Tamu Undangan",
         data.category || "Tamu Undangan",
         data.pax || 1,
         data.table || "-",
@@ -150,26 +172,29 @@ function doPost(e) {
 
     // B. ACTION: UCAPAN DOA & VOICE NOTE
     if (data.action === "NEW_WISH") {
-      var sheetUcapan = ss.getSheetByName("Ucapan_Doa");
-      if (!sheetUcapan) sheetUcapan = getOrCreateSheet(ss, "Ucapan_Doa");
+      var sheetUcapan = getOrCreateSheetWithHeaders(ss, "Ucapan_Doa", [["Timestamp", "Nama Pengirim", "Hubungan", "Tipe", "Durasi VN (detik)", "Pesan Doa / Transkrip", "Link File Audio di Drive"]]);
 
       var driveAudioUrl = "-";
 
       // Jika ada lampiran rekaman suara (Voice Note Base64) -> simpan ke Drive
       if (data.audioBase64) {
-        var voiceFolderId = props.getProperty("VOICE_FOLDER_ID");
-        var voiceFolder = voiceFolderId ? DriveApp.getFolderById(voiceFolderId) : DriveApp.getRootFolder();
-        var fileName = "VN_" + sanitizeName(data.senderName) + "_" + Date.now() + ".webm";
-        var decodedAudio = Utilities.base64Decode(data.audioBase64);
-        var blob = Utilities.newBlob(decodedAudio, "audio/webm", fileName);
-        var file = voiceFolder.createFile(blob);
-        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-        driveAudioUrl = file.getUrl();
+        try {
+          var voiceFolder = getVoiceNotesFolder();
+          var fileName = "VN_" + sanitizeName(data.senderName) + "_" + Date.now() + ".webm";
+          var decodedAudio = Utilities.base64Decode(data.audioBase64);
+          var blob = Utilities.newBlob(decodedAudio, "audio/webm", fileName);
+          var file = voiceFolder.createFile(blob);
+          file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+          driveAudioUrl = file.getUrl();
+        } catch (errAudio) {
+          console.error("Gagal simpan audio ke Drive:", errAudio);
+          driveAudioUrl = "(Gagal simpan ke Drive: " + errAudio.toString() + ")";
+        }
       }
 
       sheetUcapan.appendRow([
         new Date(data.timestamp || new Date()),
-        data.senderName,
+        data.senderName || "Tamu Undangan",
         data.relationship || "Teman",
         data.type === "voice" ? "Voice Note (Audio)" : "Pesan Teks",
         data.audioDuration || 0,
@@ -182,28 +207,30 @@ function doPost(e) {
 
     // C. ACTION: UPLOAD FOTO / VIDEO MEDIA (Fotografer atau Tamu)
     if (data.action === "UPLOAD_MEDIA") {
-      var sheetMedia = ss.getSheetByName("Galeri_Media");
-      if (!sheetMedia) sheetMedia = getOrCreateSheet(ss, "Galeri_Media");
+      var sheetMedia = getOrCreateSheetWithHeaders(ss, "Galeri_Media", [["Timestamp", "Nama Pengunggah", "Peran (Role)", "Kategori Momen", "Caption / Cerita", "Tipe Media", "Link File di Google Drive"]]);
 
       var driveMediaUrl = "-";
+      var fileId = "";
 
       if (data.fileBase64) {
-        var targetFolderId = data.uploaderRole === "photographer"
-          ? props.getProperty("FOTO_FOLDER_ID")
-          : props.getProperty("TAMU_FOLDER_ID");
+        try {
+          var targetFolder = getTargetMediaFolder(data.uploaderRole);
+          var mime = data.mimeType || "image/jpeg";
+          var ext = mime.indexOf("video") >= 0 ? ".mp4" : ".jpg";
+          var mediaFileName = (data.uploaderRole === "photographer" ? "OFFICIAL_" : "GUEST_") +
+            sanitizeName(data.uploaderName) + "_" + Date.now() + ext;
 
-        var targetFolder = targetFolderId ? DriveApp.getFolderById(targetFolderId) : DriveApp.getRootFolder();
-        var mime = data.mimeType || "image/jpeg";
-        var ext = mime.indexOf("video") >= 0 ? ".mp4" : ".jpg";
-        var mediaFileName = (data.uploaderRole === "photographer" ? "OFFICIAL_" : "GUEST_") +
-          sanitizeName(data.uploaderName) + "_" + Date.now() + ext;
-
-        var decodedMedia = Utilities.base64Decode(data.fileBase64);
-        var mediaBlob = Utilities.newBlob(decodedMedia, mime, mediaFileName);
-        var mediaFile = targetFolder.createFile(mediaBlob);
-        var fileId = mediaFile.getId();
-        // Gunakan CDN langsung lh3.googleusercontent.com agar gambar dapat langsung tampil di <img> tag semua perangkat tanpa login
-        driveMediaUrl = "https://lh3.googleusercontent.com/d/" + fileId;
+          var decodedMedia = Utilities.base64Decode(data.fileBase64);
+          var mediaBlob = Utilities.newBlob(decodedMedia, mime, mediaFileName);
+          var mediaFile = targetFolder.createFile(mediaBlob);
+          mediaFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+          fileId = mediaFile.getId();
+          // Gunakan CDN langsung lh3.googleusercontent.com agar gambar dapat langsung tampil di <img> tag semua perangkat tanpa login
+          driveMediaUrl = "https://lh3.googleusercontent.com/d/" + fileId;
+        } catch (errDrive) {
+          console.error("Gagal simpan media ke Drive:", errDrive);
+          driveMediaUrl = "(Gagal simpan ke Drive: " + errDrive.toString() + ")";
+        }
       }
 
       sheetMedia.appendRow([
@@ -345,6 +372,66 @@ function formatSheetHeader(sheet, numCols) {
   for (var i = 1; i <= numCols; i++) {
     sheet.autoResizeColumn(i);
   }
+}
+
+function getOrCreateSheetWithHeaders(ss, sheetName, headers) {
+  var s = ss.getSheetByName(sheetName);
+  if (!s) {
+    s = ss.insertSheet(sheetName);
+    if (headers && headers.length > 0) {
+      s.getRange(1, 1, headers.length, headers[0].length).setValues(headers);
+      formatSheetHeader(s, headers[0].length);
+    }
+  } else if (s.getLastRow() === 0 && headers && headers.length > 0) {
+    s.getRange(1, 1, headers.length, headers[0].length).setValues(headers);
+    formatSheetHeader(s, headers[0].length);
+  }
+  return s;
+}
+
+function getTargetMediaFolder(role) {
+  var props = PropertiesService.getScriptProperties();
+  var folderKey = (role === "photographer") ? "FOTO_FOLDER_ID" : "TAMU_FOLDER_ID";
+  var folderId = props.getProperty(folderKey);
+  if (folderId) {
+    try {
+      return DriveApp.getFolderById(folderId);
+    } catch(e) {}
+  }
+
+  // Otomatis buat folder jika belum pernah disetup
+  var subName = (role === "photographer") ? "01_Foto_Fotografer" : "02_Momen_Tamu";
+  var rootName = "HeMa Wedding Live - Master Media";
+  var rootIter = DriveApp.getFoldersByName(rootName);
+  var rootFolder = rootIter.hasNext() ? rootIter.next() : DriveApp.createFolder(rootName);
+  rootFolder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+  var subIter = rootFolder.getFoldersByName(subName);
+  var sub = subIter.hasNext() ? subIter.next() : rootFolder.createFolder(subName);
+  sub.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  try { props.setProperty(folderKey, sub.getId()); } catch(e) {}
+  return sub;
+}
+
+function getVoiceNotesFolder() {
+  var props = PropertiesService.getScriptProperties();
+  var folderId = props.getProperty("VOICE_FOLDER_ID");
+  if (folderId) {
+    try {
+      return DriveApp.getFolderById(folderId);
+    } catch(e) {}
+  }
+
+  var rootName = "HeMa Wedding Live - Master Media";
+  var rootIter = DriveApp.getFoldersByName(rootName);
+  var rootFolder = rootIter.hasNext() ? rootIter.next() : DriveApp.createFolder(rootName);
+  rootFolder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+  var subIter = rootFolder.getFoldersByName("03_Voice_Notes_Audio");
+  var sub = subIter.hasNext() ? subIter.next() : rootFolder.createFolder("03_Voice_Notes_Audio");
+  sub.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  try { props.setProperty("VOICE_FOLDER_ID", sub.getId()); } catch(e) {}
+  return sub;
 }
 
 function getOrCreateSheet(ss, sheetName) {

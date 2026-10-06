@@ -17,8 +17,9 @@ import {
 import { QRScannerModal } from '../components/QRScannerModal';
 import { QRGeneratorModal } from '../components/QRGeneratorModal';
 import { INITIAL_GUESTS } from '../services/mockData';
-import { saveCheckin, getAllCheckins, setAppState, getAppState } from '../services/db';
+import { saveCheckin, getAllCheckins, setAppState, getAppState, markCheckinSynced } from '../services/db';
 import { syncService } from '../services/syncService';
+import { syncCheckinToGoogle } from '../services/googleSync';
 import { getAllGuests, addGuest } from '../services/guestService';
 
 export function CheckIn() {
@@ -105,16 +106,18 @@ export function CheckIn() {
       checkedInBy: method === 'scanner' ? 'Scan Barcode' : 'Manual Panitia'
     };
 
-    // Save to IndexedDB (Works online AND offline!)
-    await saveCheckin({
+    const checkinPayload = {
       guestId: guest.id,
       guestName: guest.name,
       pax: guest.pax || 1,
       category: guest.category,
       timestamp: updated.checkedInAt,
       checkedInBy: updated.checkedInBy,
-      synced: isOnline,
-    });
+      synced: false,
+    };
+
+    // Save to IndexedDB (Works online AND offline!)
+    const savedCheckin = await saveCheckin(checkinPayload);
 
     const newGuestList = guests.map(g => g.id === guest.id ? updated : g);
     setGuests(newGuestList);
@@ -122,6 +125,11 @@ export function CheckIn() {
 
     setSuccessGuest(updated);
     triggerCelebration();
+
+    // Kirim langsung ke Google Sheets
+    syncCheckinToGoogle(checkinPayload)
+      .then(() => markCheckinSynced(savedCheckin.id))
+      .catch((err) => console.warn('Direct checkin sync failed, will retry:', err));
 
     // Trigger sync if online
     if (isOnline) {

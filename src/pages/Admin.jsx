@@ -44,7 +44,8 @@ import {
   saveGoogleSettings, 
   exportCheckinsToCSV, 
   exportWishesToCSV,
-  getSyncLogs 
+  getSyncLogs,
+  testGoogleConnection 
 } from '../services/googleSync';
 import { getAllCheckins, getAllWishes, getAllMoments } from '../services/db';
 import { 
@@ -71,6 +72,8 @@ export function Admin({ setActivePage }) {
   // Google Integration State
   const [googleForm, setGoogleForm] = useState(getGoogleSettings());
   const [googleSaveSuccess, setGoogleSaveSuccess] = useState(false);
+  const [testingGoogle, setTestingGoogle] = useState(false);
+  const [googleTestStatus, setGoogleTestStatus] = useState(null);
 
   // Guest Management State
   const [guestList, setGuestList] = useState([]);
@@ -443,6 +446,35 @@ export function Admin({ setActivePage }) {
     saveGoogleSettings(googleForm);
     setGoogleSaveSuccess(true);
     setTimeout(() => setGoogleSaveSuccess(false), 3000);
+  };
+
+  const handleTestGoogleConnection = async () => {
+    if (!googleForm.sheetsWebhookUrl || !googleForm.sheetsWebhookUrl.startsWith('http')) {
+      setGoogleTestStatus({
+        type: 'error',
+        message: 'Masukkan URL Webhook Google Apps Script terlebih dahulu!'
+      });
+      return;
+    }
+
+    setTestingGoogle(true);
+    setGoogleTestStatus(null);
+    try {
+      saveGoogleSettings(googleForm);
+      await testGoogleConnection(googleForm.sheetsWebhookUrl);
+      setGoogleTestStatus({
+        type: 'success',
+        message: '✅ Sinyal uji coba berhasil dikirim! Silakan buka Google Spreadsheet Anda, cek tab "Checkin_Kehadiran" untuk memastikan ada baris bertuliskan "TEST_CONNECTION".'
+      });
+    } catch (err) {
+      setGoogleTestStatus({
+        type: 'error',
+        message: '❌ Gagal mengirim: ' + (err.message || 'Periksa kembali URL dan pastikan hak akses Web App di-set ke "Anyone / Siapa saja".')
+      });
+    } finally {
+      setTestingGoogle(false);
+      setAuditLogs(getSyncLogs());
+    }
   };
 
   // Export handlers
@@ -1206,45 +1238,151 @@ export function Admin({ setActivePage }) {
 
       {/* TAB 3: INTEGRASI GOOGLE SHEETS & DRIVE */}
       {activeTab === 'google' && (
-        <form onSubmit={handleSaveGoogleSettings} className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-            <h3 className="font-serif font-bold text-lg text-navy-950">
-              Integrasi Otomatis Google Sheets & Drive
-            </h3>
-            {googleSaveSuccess && (
-              <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Pengaturan Tersimpan!</span>
-              </span>
-            )}
-          </div>
+        <div className="space-y-6">
+          <form onSubmit={handleSaveGoogleSettings} className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="font-serif font-bold text-lg text-navy-950">
+                  Integrasi Otomatis Google Sheets & Drive
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Sinkronisasi buku tamu, ucapan & doa, voice note, foto & video langsung ke Google Spreadsheet & Google Drive Anda.
+                </p>
+              </div>
+              {googleSaveSuccess && (
+                <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1 shrink-0">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Tersimpan!</span>
+                </span>
+              )}
+            </div>
 
-          <p className="text-xs text-slate-600">
-            Hubungkan aplikasi ke Google Spreadsheet Anda menggunakan URL Webhook Apps Script yang sudah disediakan di file <code className="text-navy-900 bg-slate-100 px-1 py-0.5 rounded font-mono">google-apps-script.js</code>.
-          </p>
-
-          <div className="space-y-3">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Google Apps Script Webhook URL (Untuk Auto Sheets & Drive)
+                Google Apps Script Webhook URL (Web App /exec)
               </label>
-              <input
-                type="url"
-                value={googleForm.sheetsWebhookUrl}
-                onChange={(e) => setGoogleForm({ ...googleForm, sheetsWebhookUrl: e.target.value })}
-                placeholder="https://script.google.com/macros/s/.../exec"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 font-mono focus:outline-none focus:border-navy-600 focus:bg-white transition"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  value={googleForm.sheetsWebhookUrl}
+                  onChange={(e) => {
+                    setGoogleForm({ ...googleForm, sheetsWebhookUrl: e.target.value });
+                    setGoogleTestStatus(null);
+                  }}
+                  placeholder="https://script.google.com/macros/s/.../exec"
+                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 font-mono focus:outline-none focus:border-navy-600 focus:bg-white transition"
+                />
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">
+                URL ini otomatis disematkan ke dalam barcode meja tamu, sehingga tamu yang scan langsung tersambung ke spreadsheet yang sama.
+              </p>
+            </div>
+
+            {/* Test Status Alert */}
+            {googleTestStatus && (
+              <div className={`p-3 rounded-xl text-xs flex items-start gap-2 border ${
+                googleTestStatus.type === 'success' 
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                  : 'bg-rose-50 text-rose-800 border-rose-200'
+              }`}>
+                {googleTestStatus.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                ) : (
+                  <HelpCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                )}
+                <div className="flex-1 leading-relaxed">
+                  {googleTestStatus.message}
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              <button
+                type="submit"
+                className="w-full py-2.5 bg-navy-950 hover:bg-navy-900 text-white font-bold text-xs rounded-xl transition shadow-sm flex items-center justify-center gap-1.5"
+              >
+                <Check className="w-4 h-4" />
+                <span>Simpan URL Webhook</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleTestGoogleConnection}
+                disabled={testingGoogle}
+                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition shadow-sm flex items-center justify-center gap-1.5"
+              >
+                {testingGoogle ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Sedang Menguji Koneksi...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    <span>Uji Coba Kirim Data ke Spreadsheet</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+
+          {/* Card Panduan Praktis Integrasi Google Sheets */}
+          <div className="bg-slate-50 border border-slate-200 rounded-3xl p-5 sm:p-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <Cloud className="w-5 h-5 text-navy-800" />
+              <h4 className="font-serif font-bold text-base text-navy-950">
+                Panduan Praktis Update Google Apps Script
+              </h4>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Agar data ucapan, doa, voice note, foto & video tersimpan rapi di Google Drive dan Google Sheets Anda tanpa kendala folder, ikuti 4 langkah mudah berikut:
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              <div className="p-3.5 bg-white rounded-2xl border border-slate-200 space-y-1">
+                <span className="font-bold text-navy-950 flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-navy-100 text-navy-900 text-[11px] font-bold flex items-center justify-center">1</span>
+                  Buka Apps Script di Spreadsheet
+                </span>
+                <p className="text-slate-600 text-[11px] leading-relaxed">
+                  Buka Google Spreadsheet Anda &rarr; klik menu <b>Ekstensi (Extensions)</b> &rarr; pilih <b>Apps Script</b>.
+                </p>
+              </div>
+
+              <div className="p-3.5 bg-white rounded-2xl border border-slate-200 space-y-1">
+                <span className="font-bold text-navy-950 flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-navy-100 text-navy-900 text-[11px] font-bold flex items-center justify-center">2</span>
+                  Salin Kode Terbaru
+                </span>
+                <p className="text-slate-600 text-[11px] leading-relaxed">
+                  Buka file <code className="bg-slate-100 text-navy-900 px-1 py-0.5 rounded font-mono font-semibold">google-apps-script.js</code> di proyek ini, copy seluruh kodenya, lalu timpa/paste ke editor Apps Script.
+                </p>
+              </div>
+
+              <div className="p-3.5 bg-white rounded-2xl border border-slate-200 space-y-1">
+                <span className="font-bold text-navy-950 flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-navy-100 text-navy-900 text-[11px] font-bold flex items-center justify-center">3</span>
+                  Deploy / Terapkan sebagai Web App
+                </span>
+                <p className="text-slate-600 text-[11px] leading-relaxed">
+                  Klik tombol biru <b>Terapkan (Deploy)</b> &rarr; <b>Kelola Penerapan (Manage Deployments)</b> &rarr; klik ikon pensil Edit &rarr; pilih <b>Versi Baru (New Version)</b>.<br/>
+                  Pastikan <i>Akses (Who has access)</i>: <b>Siapa Saja (Anyone)</b>.
+                </p>
+              </div>
+
+              <div className="p-3.5 bg-white rounded-2xl border border-slate-200 space-y-1">
+                <span className="font-bold text-navy-950 flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-navy-100 text-navy-900 text-[11px] font-bold flex items-center justify-center">4</span>
+                  Tempel URL & Tes Koneksi
+                </span>
+                <p className="text-slate-600 text-[11px] leading-relaxed">
+                  Salin Web App URL yang berakhiran <code className="bg-slate-100 font-mono text-navy-900 px-1">/exec</code> ke kolom di atas, lalu klik <b>Uji Coba Kirim Data ke Spreadsheet</b>.
+                </p>
+              </div>
             </div>
           </div>
-
-          <button
-            type="submit"
-            className="w-full py-3 bg-navy-950 hover:bg-navy-900 text-white font-bold text-xs rounded-xl transition shadow-md"
-          >
-            Simpan Pengaturan Google
-          </button>
-        </form>
+        </div>
       )}
 
       {/* TAB 5: EKSPOR DATA CSV */}

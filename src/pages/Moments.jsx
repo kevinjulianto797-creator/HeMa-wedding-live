@@ -16,8 +16,9 @@ import {
   FolderOpen
 } from 'lucide-react';
 import { INITIAL_MOMENTS } from '../services/mockData';
-import { getAllMoments, saveMoment, updateMomentLikes } from '../services/db';
+import { getAllMoments, saveMoment, updateMomentLikes, markMomentSynced } from '../services/db';
 import { syncService } from '../services/syncService';
+import { syncMediaToGoogle } from '../services/googleSync';
 import { getWeddingSettings } from '../services/weddingSettings';
 import { InAppCameraModal } from '../components/InAppCameraModal';
 
@@ -237,7 +238,7 @@ export function Moments() {
         previewUrl: previewMedia.url,
         likes: 1,
         timestamp: new Date().toISOString(),
-        synced: isOnline,
+        synced: false,
       };
 
       await saveMoment(newMoment);
@@ -256,6 +257,11 @@ export function Moments() {
       setMediaFile(null);
       setCaption('');
       setUploaderName('');
+
+      // Kirim langsung foto / video ke Google Drive & Sheets
+      syncMediaToGoogle(newMoment)
+        .then(() => markMomentSynced(newMoment.id))
+        .catch((err) => console.warn('Direct media sync failed, will retry:', err));
 
       if (isOnline) {
         syncService.syncAll();

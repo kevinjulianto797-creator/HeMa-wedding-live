@@ -14,8 +14,9 @@ import {
 import { VoiceRecorder } from '../components/VoiceRecorder';
 import { AudioPlayer } from '../components/AudioPlayer';
 import { INITIAL_WISHES } from '../services/mockData';
-import { getAllWishes, saveWish } from '../services/db';
+import { getAllWishes, saveWish, markWishSynced } from '../services/db';
 import { syncService } from '../services/syncService';
+import { syncWishToGoogle } from '../services/googleSync';
 import { getWeddingSettings } from '../services/weddingSettings';
 
 export function Wishes() {
@@ -94,7 +95,7 @@ export function Wishes() {
         type: 'text',
         audioDuration: 0,
         timestamp: new Date().toISOString(),
-        synced: isOnline,
+        synced: false,
       };
 
       await saveWish(newWish);
@@ -103,6 +104,11 @@ export function Wishes() {
       setMessageText('');
       setSenderName('');
       triggerWishCelebration();
+
+      // Kirim langsung ke Google Sheets & Drive
+      syncWishToGoogle(newWish)
+        .then(() => markWishSynced(newWish.id))
+        .catch((err) => console.warn('Direct wish sync failed, will retry:', err));
 
       if (isOnline) {
         syncService.syncAll();
@@ -125,7 +131,7 @@ export function Wishes() {
         audioBlob,
         audioDuration,
         timestamp: new Date().toISOString(),
-        synced: isOnline,
+        synced: false,
       };
 
       await saveWish(newWish);
@@ -134,6 +140,11 @@ export function Wishes() {
       setSenderName('');
       setActiveFormTab('text');
       triggerWishCelebration();
+
+      // Kirim langsung ke Google Sheets & Drive
+      syncWishToGoogle(newWish)
+        .then(() => markWishSynced(newWish.id))
+        .catch((err) => console.warn('Direct voice note sync failed, will retry:', err));
 
       if (isOnline) {
         syncService.syncAll();
