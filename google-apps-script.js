@@ -95,15 +95,6 @@ function setupDatabase() {
       var undanganHeaders = [["ID Tamu", "Nama Tamu", "Kategori", "Pax", "Meja", "Token QR", "Status Hadir", "Jam Kehadiran"]];
       sheetUndangan.getRange(1, 1, 1, undanganHeaders[0].length).setValues(undanganHeaders);
       formatSheetHeader(sheetUndangan, undanganHeaders[0].length);
-
-      // Berikan data template contoh
-      var sampleGuests = [
-        ["GUEST-001", "Bpk. Ahmad Fauzi & Keluarga", "VIP / Tamu Kehormatan", 2, "Meja VIP 01", "HEMA-VIP-AF001", "Belum Hadir", "-"],
-        ["GUEST-002", "Ibu Ratna Dewi, S.E.", "Keluarga Mempelai Pria", 3, "Meja Keluarga 02", "HEMA-FAM-RD002", "Belum Hadir", "-"],
-        ["GUEST-003", "Dimas Wicaksono", "Sahabat SMA / Groomsmen", 1, "Meja Sahabat 05", "HEMA-FRN-DW003", "Belum Hadir", "-"],
-        ["GUEST-004", "dr. Sarah Amanda", "Sahabat Kuliah / Bridesmaid", 2, "Meja Bridesmaid 04", "HEMA-BRD-SA004", "Belum Hadir", "-"]
-      ];
-      sheetUndangan.getRange(2, 1, sampleGuests.length, sampleGuests[0].length).setValues(sampleGuests);
     }
 
     // Hapus Sheet1 bawaan kosong jika ada

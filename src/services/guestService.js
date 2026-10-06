@@ -20,13 +20,25 @@ export function generateGuestToken(name = '', category = 'Tamu') {
 // Get all guests from Local/IndexedDB
 export async function getAllGuests() {
   try {
-    const list = await getAppState(GUEST_STORAGE_KEY);
-    if (Array.isArray(list)) {
-      return list;
+    let list = await getAppState(GUEST_STORAGE_KEY);
+    if (!Array.isArray(list)) {
+      const local = localStorage.getItem(GUEST_STORAGE_KEY);
+      list = local ? JSON.parse(local) : [];
     }
-    // Fallback localStorage
-    const local = localStorage.getItem(GUEST_STORAGE_KEY);
-    return local ? JSON.parse(local) : [];
+
+    // Pembersihan otomatis: Hapus data dummy bawaan (Ahmad Fauzi & Ratna Dewi) jika masih tersimpan di memori lokal HP/laptop
+    const cleaned = (list || []).filter((g) => {
+      if (!g || !g.name) return false;
+      const isDummyId = g.id === 'GUEST-001' || g.id === 'GUEST-002' || g.id === 'GUEST-003' || g.id === 'GUEST-004';
+      const isDummyName = g.name.includes('Ahmad Fauzi') || g.name.includes('Ratna Dewi') || g.name.includes('Dimas Wicaksono') || g.name.includes('Sarah Amanda');
+      return !isDummyId && !isDummyName;
+    });
+
+    if (cleaned.length !== (list || []).length) {
+      await saveAllGuests(cleaned);
+    }
+
+    return cleaned;
   } catch (err) {
     console.error('Error fetching guests:', err);
     return [];

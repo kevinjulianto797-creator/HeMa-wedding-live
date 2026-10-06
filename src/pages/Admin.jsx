@@ -44,10 +44,6 @@ import {
   exportWishesToCSV,
   getSyncLogs 
 } from '../services/googleSync';
-import { 
-  getCloudflareSettings, 
-  saveCloudflareSettings 
-} from '../services/cloudflareSettings';
 import { getAllCheckins, getAllWishes, getAllMoments } from '../services/db';
 import { 
   getAllGuests, 
@@ -64,7 +60,7 @@ export function Admin({ setActivePage }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
-  const [activeTab, setActiveTab] = useState('guests'); // 'guests' | 'wedding_info' | 'cloudflare' | 'google' | 'export' | 'security'
+  const [activeTab, setActiveTab] = useState('guests'); // 'guests' | 'wedding_info' | 'google' | 'export' | 'security'
 
   // Wedding Settings State
   const [weddingForm, setWeddingForm] = useState(getWeddingSettings());
@@ -73,10 +69,6 @@ export function Admin({ setActivePage }) {
   // Google Integration State
   const [googleForm, setGoogleForm] = useState(getGoogleSettings());
   const [googleSaveSuccess, setGoogleSaveSuccess] = useState(false);
-
-  // Cloudflare Settings State
-  const [cfForm, setCfForm] = useState(getCloudflareSettings());
-  const [cfSaveSuccess, setCfSaveSuccess] = useState(false);
 
   // Guest Management State
   const [guestList, setGuestList] = useState([]);
@@ -116,7 +108,7 @@ export function Admin({ setActivePage }) {
 
     setStats({ checkins: c.length, wishes: w.length, moments: m.length });
     setAuditLogs(getSyncLogs());
-    setGuestList(g && g.length > 0 ? g : INITIAL_GUESTS);
+    setGuestList(Array.isArray(g) ? g : []);
   };
 
   const handleLogin = (e) => {
@@ -188,6 +180,14 @@ export function Admin({ setActivePage }) {
     }
   };
 
+  // 4. Clear All Guests
+  const handleClearAllGuests = async () => {
+    if (window.confirm('PERINGATAN: Apakah Anda yakin ingin MENGHAPUS SEMUA data tamu undangan? Tindakan ini akan mengosongkan daftar tamu.')) {
+      await clearAllGuests();
+      await loadData();
+    }
+  };
+
   const [linkCopied, setLinkCopied] = useState(false);
 
   const handleCopyShareLink = () => {
@@ -215,13 +215,6 @@ export function Admin({ setActivePage }) {
     saveGoogleSettings(googleForm);
     setGoogleSaveSuccess(true);
     setTimeout(() => setGoogleSaveSuccess(false), 3000);
-  };
-
-  const handleSaveCloudflareSettings = (e) => {
-    e.preventDefault();
-    saveCloudflareSettings(cfForm);
-    setCfSaveSuccess(true);
-    setTimeout(() => setCfSaveSuccess(false), 3000);
   };
 
   // Export handlers
@@ -302,7 +295,7 @@ export function Admin({ setActivePage }) {
             Panel Admin Pernikahan
           </h2>
           <p className="text-xs text-slate-500">
-            Kelola daftar tamu, upload file Excel, integrasi Cloudflare & Google, serta keamanan.
+            Kelola daftar tamu, upload file Excel, integrasi Google Sheets & Drive, serta keamanan.
           </p>
         </div>
 
@@ -346,17 +339,6 @@ export function Admin({ setActivePage }) {
         >
           <Heart className="w-3.5 h-3.5" />
           <span>Nama & Waktu Acara</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('cloudflare')}
-          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition ${
-            activeTab === 'cloudflare'
-              ? 'bg-navy-950 text-white shadow-xs font-bold'
-              : 'text-slate-600 hover:text-navy-900'
-          }`}
-        >
-          <Cloud className="w-3.5 h-3.5 text-amber-500" />
-          <span>Koneksi Cloudflare</span>
         </button>
         <button
           onClick={() => setActiveTab('google')}
@@ -609,69 +591,95 @@ export function Admin({ setActivePage }) {
                 </p>
               </div>
 
-              <div className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={guestSearch}
-                  onChange={(e) => setGuestSearch(e.target.value)}
-                  placeholder="Cari nama / meja / token..."
-                  className="bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-navy-600 focus:bg-white transition"
-                />
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={guestSearch}
+                    onChange={(e) => setGuestSearch(e.target.value)}
+                    placeholder="Cari nama / meja / token..."
+                    className="bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-navy-600 focus:bg-white transition"
+                  />
+                </div>
+                {guestList.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleClearAllGuests}
+                    className="px-2.5 py-1.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-semibold flex items-center gap-1 transition shrink-0"
+                    title="Kosongkan seluruh data tamu"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Kosongkan Semua</span>
+                  </button>
+                )}
               </div>
             </div>
 
             <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto pr-1">
-              {filteredGuests.map((guest) => (
-                <div key={guest.id} className="py-3 flex items-center justify-between gap-2">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-xs sm:text-sm text-navy-950">
-                        {guest.name}
-                      </span>
-                      {guest.checkedIn && (
-                        <span className="px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 text-[10px] font-semibold border border-emerald-200">
-                          Hadir
-                        </span>
-                      )}
+              {filteredGuests.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 text-xs">
+                  {guestSearch ? (
+                    'Tidak ada nama tamu yang cocok dengan pencarian.'
+                  ) : (
+                    <div className="space-y-1">
+                      <p className="font-semibold text-slate-500">Daftar Tamu Masih Kosong</p>
+                      <p className="text-[11px] text-slate-400">Silakan upload file Excel atau tambahkan tamu manual melalui formulir di atas.</p>
                     </div>
-                    <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
-                      <span className="text-navy-900 font-semibold">{guest.category}</span>
-                      <span>•</span>
-                      <span>{guest.table}</span>
-                      <span>•</span>
-                      <span>{guest.pax} Orang</span>
-                      <span>•</span>
-                      <span className="font-mono text-[10px] text-slate-400">{guest.qrToken}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      onClick={() =>
-                        setSelectedGuestQr({
-                          value: guest.qrToken,
-                          title: guest.name,
-                          subtitle: `${guest.category} • ${guest.table} (${guest.pax} Pax)`,
-                        })
-                      }
-                      title="Lihat / Unduh QR Code Tamu"
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-navy-50 hover:bg-navy-100 text-navy-900 border border-navy-200 text-xs font-semibold transition"
-                    >
-                      <QrCode className="w-3.5 h-3.5 text-navy-700" />
-                      <span className="hidden sm:inline">QR Code</span>
-                    </button>
-
-                    <button
-                      onClick={() => handleDeleteGuest(guest.id, guest.name)}
-                      title="Hapus Tamu"
-                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                  )}
                 </div>
-              ))}
+              ) : (
+                filteredGuests.map((guest) => (
+                  <div key={guest.id} className="py-3 flex items-center justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-xs sm:text-sm text-navy-950">
+                          {guest.name}
+                        </span>
+                        {guest.checkedIn && (
+                          <span className="px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 text-[10px] font-semibold border border-emerald-200">
+                            Hadir
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
+                        <span className="text-navy-900 font-semibold">{guest.category}</span>
+                        <span>•</span>
+                        <span>{guest.table}</span>
+                        <span>•</span>
+                        <span>{guest.pax} Orang</span>
+                        <span>•</span>
+                        <span className="font-mono text-[10px] text-slate-400">{guest.qrToken}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        onClick={() =>
+                          setSelectedGuestQr({
+                            value: guest.qrToken,
+                            title: guest.name,
+                            subtitle: `${guest.category} • ${guest.table} (${guest.pax} Pax)`,
+                          })
+                        }
+                        title="Lihat / Unduh QR Code Tamu"
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-navy-50 hover:bg-navy-100 text-navy-900 border border-navy-200 text-xs font-semibold transition"
+                      >
+                        <QrCode className="w-3.5 h-3.5 text-navy-700" />
+                        <span className="hidden sm:inline">QR Code</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteGuest(guest.id, guest.name)}
+                        title="Hapus Tamu"
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -862,98 +870,7 @@ export function Admin({ setActivePage }) {
       </div>
     )}
 
-      {/* TAB 3: KONEKSI CLOUDFLARE (R2 & PAGES) */}
-      {activeTab === 'cloudflare' && (
-        <div className="space-y-6">
-          <form onSubmit={handleSaveCloudflareSettings} className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <Cloud className="w-5 h-5 text-amber-500" />
-                <h3 className="font-serif font-bold text-lg text-navy-950">
-                  Pengaturan Cloudflare R2 (Penyimpanan Media)
-                </h3>
-              </div>
-              {cfSaveSuccess && (
-                <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Pengaturan Disimpan!</span>
-                </span>
-              )}
-            </div>
-
-            <p className="text-xs text-slate-600">
-              Cloudflare R2 menyediakan kapasitas penyimpanan foto & video gratis 10 GB per bulan dengan <strong>$0 Egress Fee</strong> (bebas biaya streaming bandwidth keluar).
-            </p>
-
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Nama Bucket Cloudflare R2
-                </label>
-                <input
-                  type="text"
-                  value={cfForm.r2BucketName}
-                  onChange={(e) => setCfForm({ ...cfForm, r2BucketName: e.target.value })}
-                  placeholder="Contoh: hema-wedding-media"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 font-mono focus:outline-none focus:border-navy-600 focus:bg-white transition"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Public Domain / R2 Custom URL (Untuk Link Gambar)
-                </label>
-                <input
-                  type="url"
-                  value={cfForm.r2PublicDomain}
-                  onChange={(e) => setCfForm({ ...cfForm, r2PublicDomain: e.target.value })}
-                  placeholder="https://pub-xxxxxx.r2.dev atau https://media.domainanda.com"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 font-mono focus:outline-none focus:border-navy-600 focus:bg-white transition"
-                />
-                <span className="text-[10px] text-slate-500 mt-1 block">
-                  Dapat diperoleh dari menu R2 Bucket Settings → "Public Development URL" atau "Custom Domain".
-                </span>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full py-3 bg-navy-950 hover:bg-navy-900 text-white font-bold text-xs rounded-xl transition shadow-md"
-            >
-              Simpan Pengaturan Cloudflare R2
-            </button>
-          </form>
-
-          {/* Panduan Langkah demi Langkah Cloudflare */}
-          <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-3 text-xs text-slate-600">
-            <h4 className="font-serif font-bold text-navy-950 text-sm flex items-center gap-1.5">
-              <HelpCircle className="w-4 h-4 text-amber-500" />
-              <span>Panduan Menghubungkan ke Cloudflare:</span>
-            </h4>
-
-            <div className="space-y-2 text-slate-600 leading-relaxed">
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                <p className="font-bold text-navy-950 mb-1">1. Deploy Hosting via Cloudflare Pages (Gratis & Cepat)</p>
-                <p>
-                  Buka dashboard Cloudflare → <strong>Workers & Pages</strong> → <strong>Create application</strong> → <strong>Pages</strong> → <strong>Connect to Git</strong>.
-                  Pilih repository <code>HeMa-wedding-live</code> Anda. Framework preset: <strong>Vite</strong>. Klik Deploy!
-                </p>
-              </div>
-
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                <p className="font-bold text-navy-950 mb-1">2. Buat Bucket R2 untuk Foto Resolusi Tinggi</p>
-                <p>
-                  Buka menu <strong>R2 Object Storage</strong> → <strong>Create bucket</strong> (misal beri nama <code>hema-wedding-media</code>).
-                  Buka tab <strong>Settings</strong> → pada bagian <strong>Public Access</strong>, klik <strong>Enable Public URL</strong> (atau hubungkan Custom Domain).
-                  Salin URL publik tersebut ke formulir di atas.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4: INTEGRASI GOOGLE SHEETS & DRIVE */}
+      {/* TAB 3: INTEGRASI GOOGLE SHEETS & DRIVE */}
       {activeTab === 'google' && (
         <form onSubmit={handleSaveGoogleSettings} className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">

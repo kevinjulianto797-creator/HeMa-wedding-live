@@ -23,7 +23,7 @@ import { getAllGuests } from '../services/guestService';
 
 export function CheckIn() {
   const [activeTab, setActiveTab] = useState('receptionist'); // 'receptionist' | 'self'
-  const [guests, setGuests] = useState(INITIAL_GUESTS);
+  const [guests, setGuests] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [qrModalData, setQrModalData] = useState(null); // for generating QR pass
@@ -37,7 +37,7 @@ export function CheckIn() {
         const saved = await getAllGuests();
         const checkins = await getAllCheckins();
         
-        let currentGuests = saved && saved.length > 0 ? saved : INITIAL_GUESTS;
+        let currentGuests = Array.isArray(saved) ? saved : [];
         
         // Merge checkedIn state
         currentGuests = currentGuests.map(g => {
@@ -246,70 +246,83 @@ export function CheckIn() {
 
             {/* Guest List Items */}
             <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto pr-1">
-              {filteredGuests.map((guest) => (
-                <div
-                  key={guest.id}
-                  className="py-3 flex items-center justify-between gap-3"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <p className="font-semibold text-xs sm:text-sm text-navy-950">
-                        {guest.name}
-                      </p>
-                      {guest.checkedIn && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-semibold">
-                          <CheckCircle2 className="w-3 h-3" />
-                          <span>Hadir</span>
+              {filteredGuests.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 text-xs">
+                  {searchQuery ? (
+                    'Tidak ditemukan nama tamu yang cocok dengan pencarian.'
+                  ) : (
+                    <div className="space-y-1">
+                      <p className="font-semibold text-slate-500">Daftar Tamu Masih Kosong</p>
+                      <p className="text-[11px] text-slate-400">Silakan tambahkan tamu melalui menu Admin atau upload file Excel tamu.</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                filteredGuests.map((guest) => (
+                  <div
+                    key={guest.id}
+                    className="py-3 flex items-center justify-between gap-3"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-xs sm:text-sm text-navy-950">
+                          {guest.name}
+                        </p>
+                        {guest.checkedIn && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-semibold">
+                            <CheckCircle2 className="w-3 h-3" />
+                            <span>Hadir</span>
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                        <span className="text-navy-700 font-medium">{guest.category}</span>
+                        <span>•</span>
+                        <span>{guest.table}</span>
+                        <span>•</span>
+                        <span>{guest.pax} Orang</span>
+                      </div>
+                    </div>
+
+                    {/* Action button */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {/* View QR Pass */}
+                      <button
+                        onClick={() =>
+                          setQrModalData({
+                            value: guest.qrToken,
+                            title: guest.name,
+                            subtitle: `${guest.category} • ${guest.table}`,
+                          })
+                        }
+                        title="Lihat QR Code Tiket"
+                        className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-navy-900 border border-slate-200 transition"
+                      >
+                        <QrCode className="w-4 h-4" />
+                      </button>
+
+                      {/* Check-in button */}
+                      {!guest.checkedIn ? (
+                        <button
+                          onClick={() => handleCheckInGuest(guest, 'manual')}
+                          className="px-3 py-1.5 bg-navy-950 hover:bg-navy-900 text-white rounded-lg text-xs font-semibold transition shadow-xs"
+                        >
+                          Tandai Hadir
+                        </button>
+                      ) : (
+                        <span className="text-[11px] text-slate-500 font-mono">
+                          {guest.checkedInAt
+                            ? new Date(guest.checkedInAt).toLocaleTimeString('id-ID', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
+                            : 'Hadir'}
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 text-[11px] text-slate-500">
-                      <span className="text-navy-700 font-medium">{guest.category}</span>
-                      <span>•</span>
-                      <span>{guest.table}</span>
-                      <span>•</span>
-                      <span>{guest.pax} Orang</span>
-                    </div>
                   </div>
-
-                  {/* Action button */}
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {/* View QR Pass */}
-                    <button
-                      onClick={() =>
-                        setQrModalData({
-                          value: guest.qrToken,
-                          title: guest.name,
-                          subtitle: `${guest.category} • ${guest.table}`,
-                        })
-                      }
-                      title="Lihat QR Code Tiket"
-                      className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-navy-900 border border-slate-200 transition"
-                    >
-                      <QrCode className="w-4 h-4" />
-                    </button>
-
-                    {/* Check-in button */}
-                    {!guest.checkedIn ? (
-                      <button
-                        onClick={() => handleCheckInGuest(guest, 'manual')}
-                        className="px-3 py-1.5 bg-navy-950 hover:bg-navy-900 text-white rounded-lg text-xs font-semibold transition shadow-xs"
-                      >
-                        Tandai Hadir
-                      </button>
-                    ) : (
-                      <span className="text-[11px] text-slate-500 font-mono">
-                        {guest.checkedInAt
-                          ? new Date(guest.checkedInAt).toLocaleTimeString('id-ID', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })
-                          : 'Hadir'}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>

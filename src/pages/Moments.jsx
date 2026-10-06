@@ -31,6 +31,40 @@ export function Moments() {
   const [lightboxMoment, setLightboxMoment] = useState(null);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
+  // Batasan Kuota Upload per Tamu
+  const MAX_PHOTOS_PER_GUEST = 30;
+  const MAX_VIDEOS_PER_GUEST = 2;
+  const MAX_VIDEO_DURATION_SECONDS = 30; // 30 Detik maksimal (mirip WA Status / IG Story)
+
+  const [uploadQuota, setUploadQuota] = useState(() => {
+    try {
+      const raw = localStorage.getItem('hema_guest_upload_quota');
+      return raw ? JSON.parse(raw) : { photos: 0, videos: 0 };
+    } catch {
+      return { photos: 0, videos: 0 };
+    }
+  });
+
+  // Helper untuk membaca durasi file video via HTML5 Video
+  const getVideoDuration = (file) => {
+    return new Promise((resolve) => {
+      try {
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+        video.onloadedmetadata = () => {
+          window.URL.revokeObjectURL(video.src);
+          resolve(Math.round(video.duration || 0));
+        };
+        video.onerror = () => {
+          resolve(0);
+        };
+        video.src = URL.createObjectURL(file);
+      } catch {
+        resolve(0);
+      }
+    });
+  };
+
   // Form upload state
   const [uploaderName, setUploaderName] = useState('');
   const [caption, setCaption] = useState('');
@@ -99,8 +133,38 @@ export function Moments() {
     }
   };
 
+  // Trigger handlers with quota validation
+  const handleOpenInAppCamera = () => {
+    if (uploadQuota.photos >= MAX_PHOTOS_PER_GUEST) {
+      alert(`Anda telah mencapai batas maksimal ${MAX_PHOTOS_PER_GUEST} foto per tamu. Terima kasih banyak telah mengabadikan momen berharga!`);
+      return;
+    }
+    setIsUploadOpen(false);
+    setIsCameraOpen(true);
+  };
+
+  const handleTriggerNativePhoto = () => {
+    if (uploadQuota.photos >= MAX_PHOTOS_PER_GUEST) {
+      alert(`Anda telah mencapai batas maksimal ${MAX_PHOTOS_PER_GUEST} foto per tamu. Terima kasih banyak telah mengabadikan momen berharga!`);
+      return;
+    }
+    nativePhotoInputRef.current?.click();
+  };
+
+  const handleTriggerNativeVideo = () => {
+    if (uploadQuota.videos >= MAX_VIDEOS_PER_GUEST) {
+      alert(`Anda telah mencapai batas maksimal ${MAX_VIDEOS_PER_GUEST} video ucapan per tamu. Terima kasih atas partisipasi Anda!`);
+      return;
+    }
+    nativeVideoInputRef.current?.click();
+  };
+
   // Handle photo from in-app camera modal
   const handleInAppPhotoCaptured = ({ file, previewUrl }) => {
+    if (uploadQuota.photos >= MAX_PHOTOS_PER_GUEST) {
+      alert(`Batas maksimal ${MAX_PHOTOS_PER_GUEST} foto telah tercapai.`);
+      return;
+    }
     setMediaFile(file);
     setPreviewMedia({
       url: previewUrl,
@@ -110,16 +174,40 @@ export function Moments() {
   };
 
   // Handle file select from Native Camera or Gallery
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    const isVideo = file.type.startsWith('video');
+
+    if (isVideo) {
+      if (uploadQuota.videos >= MAX_VIDEOS_PER_GUEST) {
+        alert(`Batas maksimal ${MAX_VIDEOS_PER_GUEST} video per tamu telah tercapai.`);
+        e.target.value = '';
+        return;
+      }
+
+      // Validasi durasi video maksimal 30 detik
+      const duration = await getVideoDuration(file);
+      if (duration > MAX_VIDEO_DURATION_SECONDS) {
+        alert(`Durasi video Anda adalah ${duration} detik.\n\nBatas maksimal durasi video ucapan adalah ${MAX_VIDEO_DURATION_SECONDS} detik (seperti WhatsApp Story / Status) agar proses upload cepat dan hemat kuota.`);
+        e.target.value = '';
+        return;
+      }
+    } else {
+      if (uploadQuota.photos >= MAX_PHOTOS_PER_GUEST) {
+        alert(`Batas maksimal ${MAX_PHOTOS_PER_GUEST} foto per tamu telah tercapai.`);
+        e.target.value = '';
+        return;
+      }
+    }
 
     setMediaFile(file);
     const reader = new FileReader();
     reader.onload = (event) => {
       setPreviewMedia({
         url: event.target.result,
-        type: file.type.startsWith('video') ? 'video' : 'photo',
+        type: isVideo ? 'video' : 'photo',
       });
       setIsUploadOpen(true);
     };
@@ -154,6 +242,14 @@ export function Moments() {
 
       await saveMoment(newMoment);
       await loadMoments();
+
+      // Perbarui kuota upload tamu di localStorage
+      const updatedQuota = {
+        photos: previewMedia.type === 'photo' ? (uploadQuota.photos || 0) + 1 : (uploadQuota.photos || 0),
+        videos: previewMedia.type === 'video' ? (uploadQuota.videos || 0) + 1 : (uploadQuota.videos || 0),
+      };
+      setUploadQuota(updatedQuota);
+      localStorage.setItem('hema_guest_upload_quota', JSON.stringify(updatedQuota));
 
       setIsUploadOpen(false);
       setPreviewMedia(null);
@@ -217,11 +313,18 @@ export function Moments() {
           </p>
         </div>
 
-        {/* Quick Camera Buttons */}
-        <div className="flex items-center gap-2">
+        {/* Quick Camera Buttons & Quota Badge */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-[11px] text-slate-600">
+            <span>Sisa Kuota:</span>
+            <span className="font-bold text-navy-950">{MAX_PHOTOS_PER_GUEST - (uploadQuota.photos || 0)} Foto</span>
+            <span>•</span>
+            <span className="font-bold text-navy-950">{MAX_VIDEOS_PER_GUEST - (uploadQuota.videos || 0)} Video (Maks 30s)</span>
+          </div>
+
           {/* Button 1: In-App Camera */}
           <button
-            onClick={() => setIsCameraOpen(true)}
+            onClick={handleOpenInAppCamera}
             className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 bg-navy-950 hover:bg-navy-900 text-white font-bold text-xs rounded-xl shadow-md transition active:scale-95"
             title="Buka Kamera di Aplikasi"
           >
@@ -424,10 +527,7 @@ export function Moments() {
                   {/* Option 1: In-App Web Camera */}
                   <button
                     type="button"
-                    onClick={() => {
-                      setIsUploadOpen(false);
-                      setIsCameraOpen(true);
-                    }}
+                    onClick={handleOpenInAppCamera}
                     className="p-3.5 rounded-2xl bg-navy-50 hover:bg-navy-100/80 border border-navy-200 flex items-center gap-3 text-left transition group"
                   >
                     <div className="w-10 h-10 rounded-xl bg-navy-950 text-white flex items-center justify-center shrink-0 group-hover:scale-105 transition">
@@ -442,7 +542,7 @@ export function Moments() {
                   {/* Option 2: Native Phone Camera (Photo) */}
                   <button
                     type="button"
-                    onClick={() => nativePhotoInputRef.current?.click()}
+                    onClick={handleTriggerNativePhoto}
                     className="p-3.5 rounded-2xl bg-navy-50 hover:bg-navy-100/80 border border-navy-200 flex items-center gap-3 text-left transition group"
                   >
                     <div className="w-10 h-10 rounded-xl bg-navy-900 text-white flex items-center justify-center shrink-0 group-hover:scale-105 transition">
@@ -457,7 +557,7 @@ export function Moments() {
                   {/* Option 3: Native Phone Camera (Video) */}
                   <button
                     type="button"
-                    onClick={() => nativeVideoInputRef.current?.click()}
+                    onClick={handleTriggerNativeVideo}
                     className="p-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center gap-3 text-left transition group"
                   >
                     <div className="w-10 h-10 rounded-xl bg-navy-800 text-white flex items-center justify-center shrink-0 group-hover:scale-105 transition">
@@ -465,7 +565,7 @@ export function Moments() {
                     </div>
                     <div>
                       <p className="text-xs font-bold text-navy-950">Rekam Video HP</p>
-                      <p className="text-[10px] text-slate-500">Rekam momen singkat</p>
+                      <p className="text-[10px] text-slate-500">Maks. durasi 30 detik</p>
                     </div>
                   </button>
 
@@ -483,6 +583,20 @@ export function Moments() {
                       <p className="text-[10px] text-slate-500">Pilih file yang ada</p>
                     </div>
                   </button>
+                </div>
+
+                {/* Quota & Video Duration Limit Notice */}
+                <div className="mt-2.5 p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-navy-950">Batas Kuota Pengunggahan Tamu:</span>
+                    <span className="font-mono text-[11px] font-bold text-navy-900">
+                      {uploadQuota.photos || 0}/{MAX_PHOTOS_PER_GUEST} Foto • {uploadQuota.videos || 0}/{MAX_VIDEOS_PER_GUEST} Video
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    • Maksimal <strong>30 foto</strong> per tamu.<br />
+                    • Maksimal <strong>2 video</strong> dengan durasi <strong>maksimal 30 detik</strong> (seperti WhatsApp Story / Status) agar proses kirim cepat dan lancar.
+                  </p>
                 </div>
               </div>
             )}
