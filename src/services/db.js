@@ -180,89 +180,158 @@ export async function getAppState(key) {
 
 // --- CLOUD MERGE OPERATIONS (2-Way Realtime Sync) ---
 export async function mergeCloudMoments(cloudMoments) {
-  if (!Array.isArray(cloudMoments) || cloudMoments.length === 0) return 0;
+  if (!Array.isArray(cloudMoments)) return 0;
   const db = await initDB();
   const localMoments = await db.getAll('moments');
-  const existingUrls = new Set(localMoments.map(m => m.previewUrl).filter(Boolean));
-  const existingKeys = new Set(localMoments.map(m => `${m.timestamp}_${m.uploaderName}`));
 
-  let addedCount = 0;
+  // Amankan momen lokal yang masih antre upload (synced: false)
+  const pendingLocal = localMoments.filter(m => m.synced === false);
+
+  const cloudMap = new Map();
   for (const cm of cloudMoments) {
-    const key = `${cm.timestamp}_${cm.uploaderName}`;
-    if (!existingUrls.has(cm.previewUrl) && !existingKeys.has(key)) {
-      await db.put('moments', {
-        id: cm.id || `mmt_cloud_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-        caption: cm.caption || '',
-        uploaderName: cm.uploaderName || 'Tamu Undangan',
-        uploaderRole: cm.uploaderRole || 'guest',
-        type: cm.type || 'photo',
-        category: cm.category || 'Momen Bahagia',
-        previewUrl: cm.previewUrl,
-        likes: cm.likes || 1,
-        timestamp: cm.timestamp || new Date().toISOString(),
-        synced: true,
-      });
-      if (cm.previewUrl) existingUrls.add(cm.previewUrl);
-      existingKeys.add(key);
-      addedCount++;
-    }
+    const key = cm.previewUrl || `${cm.timestamp}_${cm.uploaderName}`;
+    cloudMap.set(key, {
+      id: cm.id || `mmt_cloud_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      caption: cm.caption || '',
+      uploaderName: cm.uploaderName || 'Tamu Undangan',
+      uploaderRole: cm.uploaderRole || 'guest',
+      type: cm.type || 'photo',
+      category: cm.category || 'Momen Bahagia',
+      previewUrl: cm.previewUrl,
+      likes: cm.likes || 1,
+      timestamp: cm.timestamp || new Date().toISOString(),
+      synced: true,
+    });
   }
-  return addedCount;
+
+  // Jika cloud kosong (misal database di-setup ulang oleh pengantin),
+  // sinkronisasi lokal akan mencerminkan cloud yang bersih tanpa data lama
+  const tx = db.transaction('moments', 'readwrite');
+  await tx.store.clear();
+
+  for (const pm of pendingLocal) {
+    await tx.store.put(pm);
+  }
+  for (const cm of cloudMap.values()) {
+    await tx.store.put(cm);
+  }
+  await tx.done;
+
+  return cloudMap.size;
 }
 
 export async function mergeCloudWishes(cloudWishes) {
-  if (!Array.isArray(cloudWishes) || cloudWishes.length === 0) return 0;
+  if (!Array.isArray(cloudWishes)) return 0;
   const db = await initDB();
   const localWishes = await db.getAll('wishes');
-  const existingKeys = new Set(localWishes.map(w => `${w.timestamp}_${w.senderName}`));
 
-  let addedCount = 0;
+  const pendingLocal = localWishes.filter(w => w.synced === false);
+
+  const cloudMap = new Map();
   for (const cw of cloudWishes) {
     const key = `${cw.timestamp}_${cw.senderName}`;
-    if (!existingKeys.has(key)) {
-      await db.put('wishes', {
-        id: cw.id || `wsh_cloud_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-        senderName: cw.senderName || 'Tamu Undangan',
-        relationship: cw.relationship || 'Teman',
-        message: cw.message || '',
-        type: cw.type || 'text',
-        audioBlob: null,
-        audioUrl: cw.audioUrl || null,
-        audioDuration: cw.audioDuration || 0,
-        timestamp: cw.timestamp || new Date().toISOString(),
-        synced: true,
-      });
-      existingKeys.add(key);
-      addedCount++;
-    }
+    cloudMap.set(key, {
+      id: cw.id || `wsh_cloud_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      senderName: cw.senderName || 'Tamu Undangan',
+      relationship: cw.relationship || 'Teman',
+      message: cw.message || '',
+      type: cw.type || 'text',
+      audioBlob: null,
+      audioUrl: cw.audioUrl || null,
+      audioDuration: cw.audioDuration || 0,
+      timestamp: cw.timestamp || new Date().toISOString(),
+      synced: true,
+    });
   }
-  return addedCount;
+
+  const tx = db.transaction('wishes', 'readwrite');
+  await tx.store.clear();
+
+  for (const pw of pendingLocal) {
+    await tx.store.put(pw);
+  }
+  for (const cw of cloudMap.values()) {
+    await tx.store.put(cw);
+  }
+  await tx.done;
+
+  return cloudMap.size;
 }
 
 export async function mergeCloudCheckins(cloudCheckins) {
-  if (!Array.isArray(cloudCheckins) || cloudCheckins.length === 0) return 0;
+  if (!Array.isArray(cloudCheckins)) return 0;
   const db = await initDB();
   const localCheckins = await db.getAll('checkins');
-  const existingKeys = new Set(localCheckins.map(c => `${c.timestamp}_${c.guestName}`));
 
-  let addedCount = 0;
+  const pendingLocal = localCheckins.filter(c => c.synced === false);
+
+  const cloudMap = new Map();
   for (const cc of cloudCheckins) {
     const key = `${cc.timestamp}_${cc.guestName}`;
-    if (!existingKeys.has(key)) {
-      await db.put('checkins', {
-        id: cc.id || `chk_cloud_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-        guestId: cc.guestId || '-',
-        guestName: cc.guestName || 'Tamu Undangan',
-        pax: cc.pax || 1,
-        category: cc.category || 'Tamu Undangan',
-        table: cc.table || '-',
-        timestamp: cc.timestamp || new Date().toISOString(),
-        checkedInBy: cc.checkedInBy || 'self',
-        synced: true,
-      });
-      existingKeys.add(key);
-      addedCount++;
-    }
+    cloudMap.set(key, {
+      id: cc.id || `chk_cloud_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      guestId: cc.guestId || '-',
+      guestName: cc.guestName || 'Tamu Undangan',
+      pax: cc.pax || 1,
+      category: cc.category || 'Tamu Undangan',
+      table: cc.table || '-',
+      timestamp: cc.timestamp || new Date().toISOString(),
+      checkedInBy: cc.checkedInBy || 'self',
+      synced: true,
+    });
   }
-  return addedCount;
+
+  const tx = db.transaction('checkins', 'readwrite');
+  await tx.store.clear();
+
+  for (const pc of pendingLocal) {
+    await tx.store.put(pc);
+  }
+  for (const cc of cloudMap.values()) {
+    await tx.store.put(cc);
+  }
+  await tx.done;
+
+  return cloudMap.size;
+}
+
+// Reset / Bersihkan seluruh data lokal (uji coba)
+export async function clearAllEventData() {
+  const db = await initDB();
+  const tx = db.transaction(['moments', 'wishes', 'checkins', 'app_state'], 'readwrite');
+  await tx.objectStore('moments').clear();
+  await tx.objectStore('wishes').clear();
+  await tx.objectStore('checkins').clear();
+  await tx.objectStore('app_state').clear();
+  await tx.done;
+
+  localStorage.removeItem('hema_guest_upload_quota');
+  localStorage.removeItem('hema_sync_logs');
+
+  window.dispatchEvent(new CustomEvent('wedding-sync-completed'));
+  return true;
+}
+
+// Hapus draft uji coba offline yang tertahan di HP
+export async function clearPendingDrafts() {
+  const db = await initDB();
+  const moments = await db.getAll('moments');
+  const wishes = await db.getAll('wishes');
+  const checkins = await db.getAll('checkins');
+
+  const tx = db.transaction(['moments', 'wishes', 'checkins'], 'readwrite');
+  for (const m of moments) {
+    if (m.synced === false) await tx.objectStore('moments').delete(m.id);
+  }
+  for (const w of wishes) {
+    if (w.synced === false) await tx.objectStore('wishes').delete(w.id);
+  }
+  for (const c of checkins) {
+    if (c.synced === false) await tx.objectStore('checkins').delete(c.id);
+  }
+  await tx.done;
+
+  localStorage.removeItem('hema_guest_upload_quota');
+  window.dispatchEvent(new CustomEvent('wedding-sync-completed'));
+  return true;
 }

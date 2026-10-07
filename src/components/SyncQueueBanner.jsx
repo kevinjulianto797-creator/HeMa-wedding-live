@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, CloudUpload, CheckCircle2, AlertCircle, X, ExternalLink } from 'lucide-react';
+import { RefreshCw, CloudUpload, CheckCircle2, AlertCircle, X, ExternalLink, Trash2 } from 'lucide-react';
 import { syncService } from '../services/syncService';
 import { getGoogleSettings, saveGoogleSettings } from '../services/googleSync';
+import { clearPendingDrafts } from '../services/db';
 
 export function SyncQueueBanner() {
   const [pendingCount, setPendingCount] = useState(0);
@@ -64,6 +65,17 @@ export function SyncQueueBanner() {
       });
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const handleDiscardDrafts = async () => {
+    if (window.confirm(`Hapus ${pendingCount} foto / data uji coba yang tersimpan di HP ini? Gunakan opsi ini jika data tersebut hanya untuk testing.`)) {
+      await clearPendingDrafts();
+      setStatusMessage({
+        type: 'info',
+        text: 'Data uji coba di HP telah dibersihkan.',
+      });
+      setTimeout(() => setStatusMessage(null), 3000);
     }
   };
 
@@ -131,23 +143,34 @@ export function SyncQueueBanner() {
               </div>
             </div>
 
-            <button
-              onClick={handleStartSync}
-              disabled={isSyncing}
-              className="px-4 py-2 rounded-xl bg-gold-400 hover:bg-gold-500 text-navy-950 text-xs font-bold transition shadow-sm flex items-center justify-center gap-1.5 shrink-0 disabled:opacity-50"
-            >
-              {isSyncing ? (
-                <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  <span>Sedang Mengirim...</span>
-                </>
-              ) : (
-                <>
-                  <CloudUpload className="w-3.5 h-3.5" />
-                  <span>Kirim ke Spreadsheet Sekarang</span>
-                </>
-              )}
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleDiscardDrafts}
+                className="px-3 py-2 rounded-xl border border-white/20 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-semibold transition"
+                title="Hapus data uji coba di HP"
+              >
+                Hapus Draft di HP
+              </button>
+
+              <button
+                onClick={handleStartSync}
+                disabled={isSyncing}
+                className="px-4 py-2 rounded-xl bg-gold-400 hover:bg-gold-500 text-navy-950 text-xs font-bold transition shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50"
+              >
+                {isSyncing ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Sedang Mengirim...</span>
+                  </>
+                ) : (
+                  <>
+                    <CloudUpload className="w-3.5 h-3.5" />
+                    <span>Kirim ke Spreadsheet</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         )}
       </div>

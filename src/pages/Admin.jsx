@@ -30,7 +30,8 @@ import {
   MessageCircle,
   Copy,
   Check,
-  Printer
+  Printer,
+  AlertTriangle
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { 
@@ -48,7 +49,7 @@ import {
   testGoogleConnection,
   syncAllGuestsToGoogle 
 } from '../services/googleSync';
-import { getAllCheckins, getAllWishes, getAllMoments } from '../services/db';
+import { getAllCheckins, getAllWishes, getAllMoments, clearAllEventData } from '../services/db';
 import { 
   getAllGuests, 
   addGuest, 
@@ -65,6 +66,14 @@ export function Admin({ setActivePage }) {
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
   const [activeTab, setActiveTab] = useState('guests'); // 'guests' | 'wedding_info' | 'google' | 'export' | 'security'
+
+  // Loading States for Buttons
+  const [isAddingGuest, setIsAddingGuest] = useState(false);
+  const [isSavingWeddingInfo, setIsSavingWeddingInfo] = useState(false);
+  const [isSavingGoogle, setIsSavingGoogle] = useState(false);
+  const [isSavingPin, setIsSavingPin] = useState(false);
+  const [isResettingEventData, setIsResettingEventData] = useState(false);
+  const [resetSuccessMsg, setResetSuccessMsg] = useState('');
 
   // Wedding Settings State
   const [weddingForm, setWeddingForm] = useState(getWeddingSettings());
@@ -133,22 +142,30 @@ export function Admin({ setActivePage }) {
   // 1. Add Single Guest
   const handleAddGuest = async (e) => {
     e.preventDefault();
-    if (!newGuestName.trim()) return;
+    if (!newGuestName.trim() || isAddingGuest) return;
 
-    const created = await addGuest({
-      name: newGuestName,
-      category: newGuestCategory,
-      pax: newGuestPax,
-      table: newGuestTable,
-    });
+    setIsAddingGuest(true);
+    try {
+      const created = await addGuest({
+        name: newGuestName,
+        category: newGuestCategory,
+        pax: newGuestPax,
+        table: newGuestTable,
+      });
 
-    setGuestSuccessMsg(`Tamu "${created.name}" berhasil ditambahkan & disinkronkan ke Google Spreadsheet!`);
-    setNewGuestName('');
-    setNewGuestPax(1);
-    setNewGuestTable('Meja Reguler');
-    await loadData();
+      setGuestSuccessMsg(`Tamu "${created.name}" berhasil ditambahkan & disinkronkan ke Google Spreadsheet!`);
+      setNewGuestName('');
+      setNewGuestPax(1);
+      setNewGuestTable('Meja Reguler');
+      await loadData();
 
-    setTimeout(() => setGuestSuccessMsg(''), 4000);
+      setTimeout(() => setGuestSuccessMsg(''), 4000);
+    } catch (err) {
+      console.error('Error adding guest:', err);
+      alert('Gagal menambahkan tamu: ' + (err.message || 'Terjadi kesalahan sistem'));
+    } finally {
+      setIsAddingGuest(false);
+    }
   };
 
   const handleSyncAllGuestsToGoogle = async () => {
@@ -453,18 +470,71 @@ export function Admin({ setActivePage }) {
     printWindow.document.close();
   };
 
-  const handleSaveWeddingSettings = (e) => {
+  const handleSaveWeddingSettings = async (e) => {
     e.preventDefault();
-    saveWeddingSettings(weddingForm);
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
+    setIsSavingWeddingInfo(true);
+    try {
+      saveWeddingSettings(weddingForm);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err) {
+      console.error(err);
+      alert('Gagal menyimpan pengaturan: ' + err.message);
+    } finally {
+      setTimeout(() => setIsSavingWeddingInfo(false), 500);
+    }
   };
 
-  const handleSaveGoogleSettings = (e) => {
+  const handleSaveGoogleSettings = async (e) => {
     e.preventDefault();
-    saveGoogleSettings(googleForm);
-    setGoogleSaveSuccess(true);
-    setTimeout(() => setGoogleSaveSuccess(false), 3000);
+    setIsSavingGoogle(true);
+    try {
+      saveGoogleSettings(googleForm);
+      setGoogleSaveSuccess(true);
+      setTimeout(() => setGoogleSaveSuccess(false), 3000);
+    } catch (err) {
+      console.error(err);
+      alert('Gagal menyimpan URL Webhook: ' + err.message);
+    } finally {
+      setTimeout(() => setIsSavingGoogle(false), 500);
+    }
+  };
+
+  const handleSavePinSettings = async (e) => {
+    e.preventDefault();
+    setIsSavingPin(true);
+    try {
+      saveWeddingSettings(weddingForm);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err) {
+      console.error(err);
+      alert('Gagal menyimpan PIN: ' + err.message);
+    } finally {
+      setTimeout(() => setIsSavingPin(false), 500);
+    }
+  };
+
+  const handleResetAllEventData = async () => {
+    const confirmed = window.confirm(
+      '⚠️ PERINGATAN RESET DATABASE ACARA:\n\n' +
+      'Apakah Anda yakin ingin MENGHAPUS SEMUA data cache lokal (foto momen, video, ucapan doa, dan kehadiran) di perangkat ini?\n\n' +
+      'Fitur ini wajib dijalankan jika Anda baru saja melakukan "Setup Database Ulang" di Google Spreadsheet agar aplikasi bersih dan kembali sinkron dari awal.'
+    );
+    if (!confirmed) return;
+
+    setIsResettingEventData(true);
+    try {
+      await clearAllEventData();
+      await loadData();
+      setResetSuccessMsg('✅ Seluruh data uji coba lokal berhasil dibersihkan! Aplikasi kini sinkron dengan Google Spreadsheet yang bersih.');
+      setTimeout(() => setResetSuccessMsg(''), 6000);
+    } catch (err) {
+      console.error(err);
+      alert('Gagal membersihkan data: ' + err.message);
+    } finally {
+      setIsResettingEventData(false);
+    }
   };
 
   const handleTestGoogleConnection = async () => {
@@ -797,7 +867,7 @@ export function Admin({ setActivePage }) {
                   value={newGuestName}
                   onChange={(e) => setNewGuestName(e.target.value)}
                   placeholder="Contoh: Bpk. Bambang & Istri"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-navy-600 focus:bg-white transition"
+                  className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-navy-600 focus:bg-white transition"
                 />
               </div>
 
@@ -808,7 +878,7 @@ export function Admin({ setActivePage }) {
                 <select
                   value={newGuestCategory}
                   onChange={(e) => setNewGuestCategory(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-navy-600 focus:bg-white transition"
+                  className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-navy-600 focus:bg-white transition cursor-pointer"
                 >
                   <option value="VIP / Kehormatan">VIP / Kehormatan</option>
                   <option value="Keluarga Mempelai Pria">Keluarga Pria</option>
@@ -829,7 +899,7 @@ export function Admin({ setActivePage }) {
                   max={10}
                   value={newGuestPax}
                   onChange={(e) => setNewGuestPax(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-navy-600 focus:bg-white transition"
+                  className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-navy-600 focus:bg-white transition"
                 />
               </div>
 
@@ -842,17 +912,27 @@ export function Admin({ setActivePage }) {
                   value={newGuestTable}
                   onChange={(e) => setNewGuestTable(e.target.value)}
                   placeholder="Contoh: Meja VIP 02"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-navy-600 focus:bg-white transition"
+                  className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-navy-600 focus:bg-white transition"
                 />
               </div>
 
-              <div className="flex items-end">
+              <div className="flex flex-col justify-end">
                 <button
                   type="submit"
-                  className="w-full py-2.5 bg-navy-950 hover:bg-navy-900 text-white font-bold text-xs rounded-xl transition shadow-md flex items-center justify-center gap-1.5"
+                  disabled={isAddingGuest}
+                  className="w-full h-10 bg-navy-950 hover:bg-navy-900 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition shadow-md flex items-center justify-center gap-1.5"
                 >
-                  <UserPlus className="w-4 h-4" />
-                  <span>+ Simpan & Buat QR</span>
+                  {isAddingGuest ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Menyimpan...</span>
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-4 h-4" />
+                      <span>+ Simpan & Buat QR</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -878,7 +958,7 @@ export function Admin({ setActivePage }) {
                     value={guestSearch}
                     onChange={(e) => setGuestSearch(e.target.value)}
                     placeholder="Cari nama / meja / token..."
-                    className="bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-navy-600 focus:bg-white transition"
+                    className="h-9 bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-navy-600 focus:bg-white transition w-44 sm:w-56"
                   />
                 </div>
                 {guestList.length > 0 && (
@@ -886,7 +966,7 @@ export function Admin({ setActivePage }) {
                     type="button"
                     onClick={handleSyncAllGuestsToGoogle}
                     disabled={isSyncingGuests}
-                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition shrink-0 shadow-xs disabled:opacity-50"
+                    className="h-9 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition shrink-0 shadow-xs disabled:opacity-50"
                     title="Kirim & sinkronkan seluruh daftar tamu ke Google Spreadsheet (sheet Daftar_Undangan)"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${isSyncingGuests ? 'animate-spin' : ''}`} />
@@ -898,7 +978,7 @@ export function Admin({ setActivePage }) {
                   <button
                     type="button"
                     onClick={handleClearAllGuests}
-                    className="px-2.5 py-1.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-semibold flex items-center gap-1 transition shrink-0"
+                    className="h-9 px-2.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-semibold flex items-center gap-1 transition shrink-0"
                     title="Kosongkan seluruh data tamu"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -1158,9 +1238,20 @@ export function Admin({ setActivePage }) {
 
           <button
             type="submit"
-            className="w-full py-3 bg-navy-950 hover:bg-navy-900 text-white font-bold text-xs rounded-xl transition shadow-md"
+            disabled={isSavingWeddingInfo}
+            className="w-full py-3 bg-navy-950 hover:bg-navy-900 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition shadow-md flex items-center justify-center gap-2"
           >
-            Simpan Perubahan Informasi Acara
+            {isSavingWeddingInfo ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>Menyimpan Perubahan...</span>
+              </>
+            ) : (
+              <>
+                <Check className="w-4 h-4 text-gold-400" />
+                <span>Simpan Perubahan Informasi Acara</span>
+              </>
+            )}
           </button>
         </form>
 
@@ -1331,10 +1422,20 @@ export function Admin({ setActivePage }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
               <button
                 type="submit"
-                className="w-full py-2.5 bg-navy-950 hover:bg-navy-900 text-white font-bold text-xs rounded-xl transition shadow-sm flex items-center justify-center gap-1.5"
+                disabled={isSavingGoogle}
+                className="w-full py-2.5 bg-navy-950 hover:bg-navy-900 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition shadow-sm flex items-center justify-center gap-1.5"
               >
-                <Check className="w-4 h-4" />
-                <span>Simpan URL Webhook</span>
+                {isSavingGoogle ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Menyimpan URL...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>Simpan URL Webhook</span>
+                  </>
+                )}
               </button>
 
               <button
@@ -1465,64 +1566,122 @@ export function Admin({ setActivePage }) {
         </div>
       )}
 
-      {/* TAB 6: KEAMANAN & PIN */}
+      {/* TAB 6: KEAMANAN, PIN & RESET DATA */}
       {activeTab === 'security' && (
-        <form onSubmit={handleSaveWeddingSettings} className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-            <h3 className="font-serif font-bold text-lg text-navy-950">
-              PIN Keamanan Admin & Fotografer
-            </h3>
-            {saveSuccess && (
-              <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>PIN Diperbarui!</span>
-              </span>
+        <div className="space-y-6">
+          <form onSubmit={handleSavePinSettings} className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="font-serif font-bold text-lg text-navy-950">
+                PIN Keamanan Admin & Fotografer
+              </h3>
+              {saveSuccess && (
+                <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>PIN Diperbarui!</span>
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                <label className="block text-xs font-bold text-navy-950">
+                  PIN Admin (Pengantin)
+                </label>
+                <p className="text-[11px] text-slate-500">
+                  Digunakan untuk membuka halaman pengaturan ini.
+                </p>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={weddingForm.adminPin}
+                  onChange={(e) => setWeddingForm({ ...weddingForm, adminPin: e.target.value })}
+                  placeholder="1234"
+                  className="w-full text-center text-lg font-mono font-bold bg-white border border-slate-200 rounded-xl p-2.5 text-navy-950 focus:outline-none focus:border-navy-600 transition"
+                />
+              </div>
+
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                <label className="block text-xs font-bold text-navy-950">
+                  PIN Fotografer (Terpisah)
+                </label>
+                <p className="text-[11px] text-slate-500">
+                  Berikan PIN ini ke tim fotografer untuk upload foto tanpa bisa mengubah data acara.
+                </p>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={weddingForm.photographerPin}
+                  onChange={(e) => setWeddingForm({ ...weddingForm, photographerPin: e.target.value })}
+                  placeholder="8888"
+                  className="w-full text-center text-lg font-mono font-bold bg-white border border-slate-200 rounded-xl p-2.5 text-navy-950 focus:outline-none focus:border-navy-600 transition"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSavingPin}
+              className="w-full py-3 bg-navy-950 hover:bg-navy-900 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition shadow-md flex items-center justify-center gap-2"
+            >
+              {isSavingPin ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Menyimpan PIN...</span>
+                </>
+              ) : (
+                <>
+                  <Key className="w-4 h-4 text-gold-400" />
+                  <span>Simpan PIN Keamanan Baru</span>
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* DANGER CARD: BERSIHKAN DATA UJI COBA / RESET DATABASE ACARA */}
+          <div className="bg-rose-50/40 border border-rose-200 rounded-3xl p-5 sm:p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-rose-100 rounded-xl text-rose-700 shrink-0 mt-0.5">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div className="flex-1">
+                <h4 className="font-serif font-bold text-base text-rose-950">
+                  Bersihkan Cache & Reset Data Uji Coba Acara
+                </h4>
+                <p className="text-xs text-rose-700 mt-1 leading-relaxed">
+                  Jika Anda baru saja melakukan <strong>"Setup Database Ulang"</strong> di Google Spreadsheet atau ingin menghapus seluruh foto momen, video, ucapan doa, dan rekapan kehadiran uji coba sebelumnya di perangkat ini agar kembali kosong dan sinkron, klik tombol di bawah ini.
+                </p>
+              </div>
+            </div>
+
+            {resetSuccessMsg && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{resetSuccessMsg}</span>
+              </div>
             )}
-          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
-              <label className="block text-xs font-bold text-navy-950">
-                PIN Admin (Pengantin)
-              </label>
-              <p className="text-[11px] text-slate-500">
-                Digunakan untuk membuka halaman pengaturan ini.
-              </p>
-              <input
-                type="text"
-                maxLength={6}
-                value={weddingForm.adminPin}
-                onChange={(e) => setWeddingForm({ ...weddingForm, adminPin: e.target.value })}
-                placeholder="1234"
-                className="w-full text-center text-lg font-mono font-bold bg-white border border-slate-200 rounded-xl p-2.5 text-navy-950 focus:outline-none focus:border-navy-600 transition"
-              />
-            </div>
-
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
-              <label className="block text-xs font-bold text-navy-950">
-                PIN Fotografer (Terpisah)
-              </label>
-              <p className="text-[11px] text-slate-500">
-                Berikan PIN ini ke tim fotografer untuk upload foto tanpa bisa mengubah data acara.
-              </p>
-              <input
-                type="text"
-                maxLength={6}
-                value={weddingForm.photographerPin}
-                onChange={(e) => setWeddingForm({ ...weddingForm, photographerPin: e.target.value })}
-                placeholder="8888"
-                className="w-full text-center text-lg font-mono font-bold bg-white border border-slate-200 rounded-xl p-2.5 text-navy-950 focus:outline-none focus:border-navy-600 transition"
-              />
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={handleResetAllEventData}
+                disabled={isResettingEventData}
+                className="w-full sm:w-auto px-5 py-2.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition shadow-sm flex items-center justify-center gap-2"
+              >
+                {isResettingEventData ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Membersihkan Data Acara...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>Bersihkan Seluruh Data Uji Coba (Reset Acara)</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
-
-          <button
-            type="submit"
-            className="w-full py-3 bg-navy-950 hover:bg-navy-900 text-white font-bold text-xs rounded-xl transition shadow-md"
-          >
-            Simpan PIN Keamanan Baru
-          </button>
-        </form>
+        </div>
       )}
 
       {/* MODAL QR CODE TAMU */}
