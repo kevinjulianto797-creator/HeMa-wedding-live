@@ -327,3 +327,43 @@ export async function syncAllGuestsToGoogle(guests) {
   addAuditLog('GUEST', `${guests.length} tamu disinkronkan ke Google Sheet Daftar_Undangan.`);
   return { success: true };
 }
+
+// 9. Sync Event Settings (Pengantin, Tanggal, Venue, dll.) to Google Sheet
+export async function syncEventSettingsToGoogle(eventSettings) {
+  const settings = getGoogleSettings();
+  if (!settings.sheetsWebhookUrl || !settings.sheetsWebhookUrl.startsWith('http')) {
+    return { success: false, message: 'URL Webhook belum diisi' };
+  }
+
+  const payload = {
+    action: 'SAVE_EVENT_SETTINGS',
+    settings: {
+      groomName: eventSettings.groomName || 'Pengantin Pria',
+      brideName: eventSettings.brideName || 'Pengantin Wanita',
+      coupleTitle: eventSettings.coupleTitle || `${eventSettings.groomName || ''} & ${eventSettings.brideName || ''}`,
+      initials: eventSettings.initials || 'W',
+      weddingDateFormatted: eventSettings.weddingDateFormatted || '',
+      weddingDateRaw: eventSettings.weddingDateRaw || '',
+      venueName: eventSettings.venueName || '',
+      venueAddress: eventSettings.venueAddress || '',
+      akadTime: eventSettings.akadTime || '',
+      receptionTime: eventSettings.receptionTime || '',
+      welcomeMessage: eventSettings.welcomeMessage || '',
+    },
+  };
+
+  try {
+    await fetch(settings.sheetsWebhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+      mode: 'no-cors',
+    });
+    addAuditLog('SETTINGS', `Informasi acara (${payload.settings.coupleTitle}) disinkronkan ke Google Spreadsheet.`);
+    return { success: true };
+  } catch (err) {
+    console.warn('Gagal sync event settings to Google:', err);
+    return { success: false, error: err };
+  }
+}
+

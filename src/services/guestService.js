@@ -208,3 +208,48 @@ export function downloadGuestTemplateExcel() {
   XLSX.utils.book_append_sheet(wb, ws, 'Daftar_Tamu');
   XLSX.writeFile(wb, 'Template_Daftar_Tamu_HeMa_Wedding.xlsx');
 }
+
+// Merge cloud guests from Google Spreadsheet
+export async function mergeCloudGuests(cloudGuests) {
+  if (!Array.isArray(cloudGuests)) return 0;
+  const current = await getAllGuests();
+  const currentMap = new Map();
+  for (const g of current) {
+    const key = g.id || g.name;
+    currentMap.set(key, g);
+  }
+
+  let updatedCount = 0;
+  for (const cg of cloudGuests) {
+    if (!cg || !cg.name) continue;
+    const key = cg.id || cg.name;
+    const existing = currentMap.get(key);
+    if (!existing) {
+      currentMap.set(key, {
+        id: cg.id || `GST_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+        name: cg.name,
+        category: cg.category || 'Tamu Undangan',
+        pax: cg.pax || 1,
+        table: cg.table || 'Meja Reguler',
+        qrToken: cg.qrToken || generateGuestToken(cg.name, cg.category),
+        checkedIn: cg.checkedIn || false,
+        checkedInAt: cg.checkedInAt || null,
+      });
+      updatedCount++;
+    } else {
+      // Update check-in status from cloud if changed
+      if (cg.checkedIn !== undefined && existing.checkedIn !== cg.checkedIn) {
+        existing.checkedIn = cg.checkedIn;
+        existing.checkedInAt = cg.checkedInAt || existing.checkedInAt;
+        updatedCount++;
+      }
+    }
+  }
+
+  if (updatedCount > 0 || (current.length === 0 && cloudGuests.length > 0)) {
+    const mergedList = Array.from(currentMap.values());
+    await saveAllGuests(mergedList);
+  }
+  return updatedCount;
+}
+

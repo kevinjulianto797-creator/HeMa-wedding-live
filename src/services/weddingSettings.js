@@ -28,28 +28,65 @@ export function getWeddingSettings() {
       settings = { ...settings, ...JSON.parse(saved) };
     }
 
-    // Auto-detect & sync if opened with URL parameters (e.g. ?couple=...&venue=...&ws=...)
-    if (typeof window !== 'undefined' && window.location.search) {
-      const urlParams = new URLSearchParams(window.location.search);
-      const coupleParam = urlParams.get('couple') || urlParams.get('mempelai');
-      const venueParam = urlParams.get('venue') || urlParams.get('lokasi');
-      const dateParam = urlParams.get('date') || urlParams.get('tgl');
-      const akadParam = urlParams.get('akad');
-      const recParam = urlParams.get('rec') || urlParams.get('resepsi');
-      const initParam = urlParams.get('init');
-      const wsParam = urlParams.get('ws') || urlParams.get('webhook');
-
+    // Auto-detect & sync if opened with URL parameters, clean slug path, or hash
+    if (typeof window !== 'undefined') {
       let hasChanges = false;
+      const urlParams = new URLSearchParams(window.location.search || '');
+      let coupleParam = urlParams.get('couple') || urlParams.get('mempelai');
+      let venueParam = urlParams.get('venue') || urlParams.get('lokasi');
+      let dateParam = urlParams.get('date') || urlParams.get('tgl');
+      let akadParam = urlParams.get('akad');
+      let recParam = urlParams.get('rec') || urlParams.get('resepsi');
+      let initParam = urlParams.get('init');
+      let sParam = urlParams.get('s');
+      let wsParam = urlParams.get('ws') || urlParams.get('webhook');
 
+      // 1. Cek parameter dari hash (contoh: #/Hendra&Maya?s=AKfy... atau #Hendra&Maya)
+      if (window.location.hash) {
+        const hashContent = window.location.hash.replace(/^#\/?/, '');
+        const hashParts = hashContent.split('?');
+        const hashPath = hashParts[0] ? decodeURIComponent(hashParts[0]).trim() : '';
+        const hashQuery = hashParts[1] || '';
+
+        if (hashQuery) {
+          const hashParams = new URLSearchParams(hashQuery);
+          if (!sParam) sParam = hashParams.get('s');
+          if (!wsParam) wsParam = hashParams.get('ws') || hashParams.get('webhook');
+          if (!coupleParam) coupleParam = hashParams.get('couple') || hashParams.get('mempelai');
+        }
+
+        const reservedPages = ['home', 'checkin', 'moments', 'wishes', 'admin', 'photographer', 'live'];
+        if (hashPath && !reservedPages.includes(hashPath.toLowerCase())) {
+          if (!coupleParam && (hashPath.includes('&') || hashPath.includes('-'))) {
+            coupleParam = hashPath;
+          }
+        }
+      }
+
+      // 2. Cek parameter dari pathname (contoh: /Hendra&Maya)
+      if (window.location.pathname && window.location.pathname !== '/' && !window.location.pathname.includes('index.html')) {
+        const cleanPath = decodeURIComponent(window.location.pathname.replace(/^\//, '')).trim();
+        const reservedPages = ['home', 'checkin', 'moments', 'wishes', 'admin', 'photographer', 'live'];
+        if (cleanPath && !reservedPages.includes(cleanPath.toLowerCase())) {
+          if (!coupleParam && (cleanPath.includes('&') || cleanPath.includes('-'))) {
+            coupleParam = cleanPath;
+          }
+        }
+      }
+
+      // Parse nama pengantin
       if (coupleParam && coupleParam.trim()) {
-        const parts = coupleParam.split('&').map(s => s.trim());
+        const separator = coupleParam.includes('&') ? '&' : '-';
+        const parts = coupleParam.split(separator).map(s => s.trim());
         const groom = parts[0] || settings.groomName;
         const bride = parts[1] || settings.brideName;
-        settings.groomName = groom;
-        settings.brideName = bride;
-        settings.coupleTitle = coupleParam.trim();
-        settings.initials = initParam || `${groom[0] || 'C'}${bride[0] || 'M'}`.toUpperCase();
-        hasChanges = true;
+        if (groom && bride) {
+          settings.groomName = groom;
+          settings.brideName = bride;
+          settings.coupleTitle = `${groom} & ${bride}`;
+          settings.initials = initParam || `${groom[0] || 'C'}${bride[0] || 'M'}`.toUpperCase();
+          hasChanges = true;
+        }
       }
 
       if (venueParam && venueParam.trim()) {
@@ -77,24 +114,35 @@ export function getWeddingSettings() {
         hasChanges = true;
       }
 
-      if (hasChanges) {
-        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+      // Auto-sync Google Apps Script Webhook URL ke HP tamu
+      let targetWebhookUrl = '';
+      if (sParam && sParam.trim()) {
+        const cleanS = sParam.trim();
+        targetWebhookUrl = cleanS.startsWith('http') 
+          ? cleanS 
+          : `https://script.google.com/macros/s/${cleanS}/exec`;
+      } else if (wsParam && wsParam.trim().startsWith('http')) {
+        targetWebhookUrl = wsParam.trim();
       }
 
-      // Auto-sync Google Apps Script Webhook URL to guest's device
-      if (wsParam && wsParam.trim().startsWith('http')) {
+      if (targetWebhookUrl) {
         try {
           const rawGoogle = localStorage.getItem('hema_google_settings');
           const currentGoogle = rawGoogle ? JSON.parse(rawGoogle) : {};
-          if (currentGoogle.sheetsWebhookUrl !== wsParam.trim()) {
+          if (currentGoogle.sheetsWebhookUrl !== targetWebhookUrl) {
             localStorage.setItem('hema_google_settings', JSON.stringify({
               ...currentGoogle,
-              sheetsWebhookUrl: wsParam.trim(),
+              sheetsWebhookUrl: targetWebhookUrl,
             }));
+            window.dispatchEvent(new CustomEvent('wedding-url-webhook-detected'));
           }
         } catch (e) {
           console.warn('Error saving Google webhook from URL:', e);
         }
+      }
+
+      if (hasChanges) {
+        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
       }
     }
 
@@ -136,32 +184,46 @@ export function saveWeddingSettings(newSettings) {
   }
 }
 
+// Tautan pendek dan elegan: https://wedding-live.hemanet.my.id/#/Groom&Bride?s=ScriptId
 export function getShareableWeddingUrl(settings) {
   const current = settings || getWeddingSettings();
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://wedding-live.hemanet.my.id';
-  const params = new URLSearchParams();
+  const groom = (current.groomName || 'Cecep').trim();
+  const bride = (current.brideName || 'Memey').trim();
+  const coupleSlug = `${groom}&${bride}`;
 
-  if (current.coupleTitle) params.set('couple', current.coupleTitle);
-  if (current.venueName) params.set('venue', current.venueName);
-  if (current.weddingDateFormatted) params.set('date', current.weddingDateFormatted);
-  if (current.akadTime) params.set('akad', current.akadTime);
-  if (current.receptionTime) params.set('rec', current.receptionTime);
-  if (current.initials) params.set('init', current.initials);
-
-  // Otomatis sertakan URL Webhook Google Apps Script agar HP tamu yang scan barcode langsung terhubung ke database yang sama
+  // Ambil scriptId singkat dari sheetsWebhookUrl (misal: AKfycb...)
+  let scriptId = '';
   try {
     const rawGoogle = localStorage.getItem('hema_google_settings');
     if (rawGoogle) {
       const parsedGoogle = JSON.parse(rawGoogle);
-      if (parsedGoogle.sheetsWebhookUrl && parsedGoogle.sheetsWebhookUrl.startsWith('http')) {
-        params.set('ws', parsedGoogle.sheetsWebhookUrl);
+      const url = parsedGoogle.sheetsWebhookUrl || '';
+      const match = url.match(/\/s\/([a-zA-Z0-9_-]+)\/exec/);
+      if (match && match[1]) {
+        scriptId = match[1];
+      } else if (url.startsWith('http')) {
+        scriptId = url;
       }
     }
   } catch (e) {
     console.warn(e);
   }
 
-  return `${origin}/?${params.toString()}`;
+  if (scriptId) {
+    const paramKey = scriptId.startsWith('http') ? 'ws' : 's';
+    return `${origin}/#/${encodeURIComponent(coupleSlug)}?${paramKey}=${encodeURIComponent(scriptId)}`;
+  }
+  return `${origin}/#/${encodeURIComponent(coupleSlug)}`;
+}
+
+// Tautan cantik murni: https://wedding-live.hemanet.my.id/#/Groom&Bride
+export function getCleanCoupleUrl(settings) {
+  const current = settings || getWeddingSettings();
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://wedding-live.hemanet.my.id';
+  const groom = (current.groomName || 'Cecep').trim();
+  const bride = (current.brideName || 'Memey').trim();
+  return `${origin}/#/${encodeURIComponent(groom)}&${encodeURIComponent(bride)}`;
 }
 
 export function getWhatsAppShareText(settings) {

@@ -97,6 +97,28 @@ function setupDatabase() {
       formatSheetHeader(sheetUndangan, undanganHeaders[0].length);
     }
 
+    // 5. Sheet: Pengaturan_Acara (Informasi Mempelai & Acara)
+    var sheetPengaturan = getOrCreateSheet(ss, "Pengaturan_Acara");
+    if (sheetPengaturan.getLastRow() === 0) {
+      var settingHeaders = [["Key", "Value"]];
+      var defaultSettings = [
+        ["groomName", "Cecep"],
+        ["brideName", "Memey"],
+        ["coupleTitle", "Cecep & Memey"],
+        ["initials", "CM"],
+        ["weddingDateFormatted", "Minggu, 18 Oktober 2026"],
+        ["weddingDateRaw", "2026-10-18"],
+        ["venueName", "Grand Ballroom Hotel Mulia"],
+        ["venueAddress", "Jl. Asia Afrika Senayan, Gelora, Jakarta Pusat"],
+        ["akadTime", "08:00 - 10:00 WIB"],
+        ["receptionTime", "11:00 - 14:00 WIB"],
+        ["welcomeMessage", "Selamat datang di Buku Tamu Digital & Live Momen Pernikahan kami."]
+      ];
+      sheetPengaturan.getRange(1, 1, 1, 2).setValues(settingHeaders);
+      formatSheetHeader(sheetPengaturan, 2);
+      sheetPengaturan.getRange(2, 1, defaultSettings.length, 2).setValues(defaultSettings);
+    }
+
     // Hapus Sheet1 bawaan kosong jika ada
     var defaultSheet = ss.getSheetByName("Sheet1");
     if (defaultSheet && ss.getSheets().length > 1) {
@@ -319,6 +341,32 @@ function doPost(e) {
       return sendJsonResponse({ status: "success", type: "guests_synced", added: addedCount });
     }
 
+    // F. ACTION: SIMPAN PENGATURAN ACARA (Informasi Mempelai, Tanggal, Tempat, dll.)
+    if (data.action === "SAVE_EVENT_SETTINGS" && data.settings) {
+      var sheetPengaturan = getOrCreateSheet(ss, "Pengaturan_Acara");
+      sheetPengaturan.clear();
+      var s = data.settings;
+      var settingHeaders = [["Key", "Value"]];
+      var settingRows = [
+        ["groomName", s.groomName || ""],
+        ["brideName", s.brideName || ""],
+        ["coupleTitle", s.coupleTitle || (s.groomName + " & " + s.brideName)],
+        ["initials", s.initials || "W"],
+        ["weddingDateFormatted", s.weddingDateFormatted || ""],
+        ["weddingDateRaw", s.weddingDateRaw || ""],
+        ["venueName", s.venueName || ""],
+        ["venueAddress", s.venueAddress || ""],
+        ["akadTime", s.akadTime || ""],
+        ["receptionTime", s.receptionTime || ""],
+        ["welcomeMessage", s.welcomeMessage || ""]
+      ];
+      sheetPengaturan.getRange(1, 1, 1, 2).setValues(settingHeaders);
+      formatSheetHeader(sheetPengaturan, 2);
+      sheetPengaturan.getRange(2, 1, settingRows.length, 2).setValues(settingRows);
+
+      return sendJsonResponse({ status: "success", type: "event_settings_saved" });
+    }
+
     return sendJsonResponse({ status: "unknown_action" });
 
   } catch (error) {
@@ -435,8 +483,22 @@ function doGet(e) {
       }
     }
 
+    // E. Ambil Pengaturan Acara dari sheet Pengaturan_Acara
+    var sheetPengaturan = ss.getSheetByName("Pengaturan_Acara");
+    var eventSettings = null;
+    if (sheetPengaturan && sheetPengaturan.getLastRow() > 1) {
+      var setRows = sheetPengaturan.getRange(2, 1, sheetPengaturan.getLastRow() - 1, 2).getValues();
+      eventSettings = {};
+      for (var sIdx = 0; sIdx < setRows.length; sIdx++) {
+        var k = String(setRows[sIdx][0]);
+        var v = setRows[sIdx][1];
+        if (k) eventSettings[k] = v;
+      }
+    }
+
     return sendJsonResponse({
       status: "success",
+      settings: eventSettings,
       moments: moments,
       wishes: wishes,
       checkins: checkins,

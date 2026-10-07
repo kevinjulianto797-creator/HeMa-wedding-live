@@ -38,6 +38,7 @@ import {
   getWeddingSettings, 
   saveWeddingSettings,
   getShareableWeddingUrl,
+  getCleanCoupleUrl,
   getWhatsAppShareText
 } from '../services/weddingSettings';
 import { 
@@ -47,7 +48,8 @@ import {
   exportWishesToCSV,
   getSyncLogs,
   testGoogleConnection,
-  syncAllGuestsToGoogle 
+  syncAllGuestsToGoogle,
+  syncEventSettingsToGoogle
 } from '../services/googleSync';
 import { getAllCheckins, getAllWishes, getAllMoments, clearAllEventData } from '../services/db';
 import { 
@@ -230,6 +232,7 @@ export function Admin({ setActivePage }) {
   };
 
   const [linkCopied, setLinkCopied] = useState(false);
+  const [cleanLinkCopied, setCleanLinkCopied] = useState(false);
   const [shareQrDataUrl, setShareQrDataUrl] = useState('');
   const [rawDateValue, setRawDateValue] = useState('');
   const [akadStartTime, setAkadStartTime] = useState('08:00');
@@ -474,7 +477,8 @@ export function Admin({ setActivePage }) {
     e.preventDefault();
     setIsSavingWeddingInfo(true);
     try {
-      saveWeddingSettings(weddingForm);
+      const updated = saveWeddingSettings(weddingForm);
+      await syncEventSettingsToGoogle(updated || weddingForm);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err) {
@@ -490,6 +494,7 @@ export function Admin({ setActivePage }) {
     setIsSavingGoogle(true);
     try {
       saveGoogleSettings(googleForm);
+      await syncEventSettingsToGoogle(weddingForm);
       setGoogleSaveSuccess(true);
       setTimeout(() => setGoogleSaveSuccess(false), 3000);
     } catch (err) {
@@ -940,8 +945,8 @@ export function Admin({ setActivePage }) {
 
           {/* List Tamu & Barcode Pass */}
           <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div>
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 pb-3 border-b border-slate-100">
+              <div className="min-w-0">
                 <h4 className="font-serif font-bold text-navy-950 text-base">
                   Daftar Tamu & Barcode Tiket ({filteredGuests.length})
                 </h4>
@@ -950,15 +955,15 @@ export function Admin({ setActivePage }) {
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
-                <div className="relative">
+              <div className="flex flex-wrap items-center gap-2 max-w-full">
+                <div className="relative flex-1 sm:flex-initial">
                   <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
                   <input
                     type="text"
                     value={guestSearch}
                     onChange={(e) => setGuestSearch(e.target.value)}
-                    placeholder="Cari nama / meja / token..."
-                    className="h-9 bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-navy-600 focus:bg-white transition w-44 sm:w-56"
+                    placeholder="Cari nama / meja..."
+                    className="h-9 w-full sm:w-44 bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-navy-600 focus:bg-white transition"
                   />
                 </div>
                 {guestList.length > 0 && (
@@ -966,7 +971,7 @@ export function Admin({ setActivePage }) {
                     type="button"
                     onClick={handleSyncAllGuestsToGoogle}
                     disabled={isSyncingGuests}
-                    className="h-9 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition shrink-0 shadow-xs disabled:opacity-50"
+                    className="h-9 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-xs disabled:opacity-50 shrink-0"
                     title="Kirim & sinkronkan seluruh daftar tamu ke Google Spreadsheet (sheet Daftar_Undangan)"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${isSyncingGuests ? 'animate-spin' : ''}`} />
@@ -978,11 +983,11 @@ export function Admin({ setActivePage }) {
                   <button
                     type="button"
                     onClick={handleClearAllGuests}
-                    className="h-9 px-2.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-semibold flex items-center gap-1 transition shrink-0"
+                    className="h-9 px-3 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-semibold flex items-center gap-1.5 transition shrink-0"
                     title="Kosongkan seluruh data tamu"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Kosongkan Semua</span>
+                    <span>Kosongkan Semua</span>
                   </button>
                 )}
               </div>
@@ -1324,27 +1329,66 @@ export function Admin({ setActivePage }) {
             </div>
           </div>
 
-          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-2 overflow-hidden">
-            <span className="text-xs font-mono text-navy-950 truncate">
-              {getShareableWeddingUrl(weddingForm)}
+          {/* Box 1: Tautan Akses Tamu & Barcode (Pendek & Otomatis Terhubung) */}
+          <div className="space-y-1.5">
+            <span className="text-[11px] font-bold text-navy-950 flex items-center gap-1.5">
+              <span>🔗 Tautan Akses Tamu & Barcode (Otomatis Sinkron Database):</span>
             </span>
-            <button
-              type="button"
-              onClick={handleCopyShareLink}
-              className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-navy-950 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition shrink-0"
-            >
-              {linkCopied ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Tersalin!</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5" />
-                  <span>Salin Link</span>
-                </>
-              )}
-            </button>
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-2 overflow-hidden">
+              <span className="text-xs font-mono text-navy-950 truncate">
+                {getShareableWeddingUrl(weddingForm)}
+              </span>
+              <button
+                type="button"
+                onClick={handleCopyShareLink}
+                className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-navy-950 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition shrink-0"
+              >
+                {linkCopied ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Tersalin!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Salin Link</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Box 2: Tautan Cantik Pendek (Clean URL untuk Media Sosial) */}
+          <div className="space-y-1.5">
+            <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+              <span>✨ Tautan Pendek Elegan (Untuk Dicetak / Bio Medsos):</span>
+            </span>
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-2 overflow-hidden">
+              <span className="text-xs font-mono font-semibold text-navy-900 truncate">
+                {getCleanCoupleUrl(weddingForm)}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(getCleanCoupleUrl(weddingForm));
+                  setCleanLinkCopied(true);
+                  setTimeout(() => setCleanLinkCopied(false), 2500);
+                }}
+                className="px-3 py-1.5 bg-navy-50 hover:bg-navy-100 text-navy-900 border border-navy-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition shrink-0"
+              >
+                {cleanLinkCopied ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Tersalin!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Salin Tautan Pendek</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
           <button

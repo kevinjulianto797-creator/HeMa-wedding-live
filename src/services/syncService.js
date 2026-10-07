@@ -15,6 +15,8 @@ import {
   syncMediaToGoogle,
   pullCloudData 
 } from './googleSync';
+import { mergeCloudGuests } from './guestService';
+import { getWeddingSettings, saveWeddingSettings } from './weddingSettings';
 
 class SyncService {
   constructor() {
@@ -45,12 +47,19 @@ class SyncService {
         if (this.isOnline) this.syncAll();
       });
 
-      // Polling berkala setiap 7 detik untuk menarik foto, ucapan, dan checkin baru dari Google Sheets & Drive
+      window.addEventListener('wedding-url-webhook-detected', () => {
+        if (this.isOnline) {
+          console.log('🔗 [SyncService] Webhook URL terdeteksi dari link tamu! Menarik data cloud sekarang...');
+          this.pullFromCloud();
+        }
+      });
+
+      // Polling berkala setiap 5 detik untuk menarik foto, ucapan, dan checkin baru dari Google Sheets & Drive
       setInterval(() => {
         if (this.isOnline && !this.isSyncing) {
           this.pullFromCloud();
         }
-      }, 7000);
+      }, 5000);
     }
   }
 
@@ -146,21 +155,52 @@ class SyncService {
       if (!cloudData || cloudData.status !== 'success') return;
 
       let hasNewData = false;
-      if (Array.isArray(cloudData.moments) && cloudData.moments.length > 0) {
+
+      // A. Sinkronisasi Pengaturan Acara (Nama Pengantin, Tanggal, Tempat, dll.)
+      if (cloudData.settings && typeof cloudData.settings === 'object') {
+        const local = getWeddingSettings();
+        if (
+          cloudData.settings.groomName &&
+          (cloudData.settings.groomName !== local.groomName ||
+           cloudData.settings.brideName !== local.brideName ||
+           cloudData.settings.weddingDateFormatted !== local.weddingDateFormatted ||
+           cloudData.settings.venueName !== local.venueName)
+        ) {
+          saveWeddingSettings({
+            ...local,
+            ...cloudData.settings,
+          });
+          hasNewData = true;
+          console.log('💍 [SyncService] Pengaturan acara diperbarui dari Google Spreadsheet!');
+        }
+      }
+
+      // B. Sinkronisasi Galeri Foto & Video
+      if (Array.isArray(cloudData.moments)) {
         const addedMoments = await mergeCloudMoments(cloudData.moments);
         if (addedMoments > 0) hasNewData = true;
       }
-      if (Array.isArray(cloudData.wishes) && cloudData.wishes.length > 0) {
+
+      // C. Sinkronisasi Ucapan Doa & Voice Notes
+      if (Array.isArray(cloudData.wishes)) {
         const addedWishes = await mergeCloudWishes(cloudData.wishes);
         if (addedWishes > 0) hasNewData = true;
       }
-      if (Array.isArray(cloudData.checkins) && cloudData.checkins.length > 0) {
+
+      // D. Sinkronisasi Kehadiran Check-In
+      if (Array.isArray(cloudData.checkins)) {
         const addedCheckins = await mergeCloudCheckins(cloudData.checkins);
         if (addedCheckins > 0) hasNewData = true;
       }
 
+      // E. Sinkronisasi Master Tamu Undangan
+      if (Array.isArray(cloudData.guests)) {
+        const addedGuests = await mergeCloudGuests(cloudData.guests);
+        if (addedGuests > 0) hasNewData = true;
+      }
+
       if (hasNewData) {
-        console.log('🔄 [SyncService] Data foto/doa baru dari Google Sheets & Drive berhasil diterima!');
+        console.log('🔄 [SyncService] Data baru dari Google Sheets & Drive berhasil diterima!');
         window.dispatchEvent(new CustomEvent('wedding-sync-completed'));
       }
     } catch (e) {
