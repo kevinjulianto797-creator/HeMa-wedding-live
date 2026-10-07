@@ -67,6 +67,7 @@ export function CheckIn() {
 
     loadCheckins();
     window.addEventListener('wedding-guests-updated', loadCheckins);
+    window.addEventListener('wedding-sync-completed', loadCheckins);
 
     const unsubscribe = syncService.subscribe((status) => {
       setIsOnline(status.isOnline);
@@ -74,6 +75,7 @@ export function CheckIn() {
 
     return () => {
       window.removeEventListener('wedding-guests-updated', loadCheckins);
+      window.removeEventListener('wedding-sync-completed', loadCheckins);
       unsubscribe();
     };
   }, []);

@@ -344,7 +344,34 @@ function doPost(e) {
       return sendJsonResponse({ status: "success", type: "guests_synced", added: addedCount });
     }
 
-    // F. ACTION: SIMPAN PENGATURAN ACARA (Informasi Mempelai, Tanggal, Tempat, dll.)
+    // F. ACTION: HAPUS SATU TAMU (DELETE_GUEST)
+    if (data.action === "DELETE_GUEST") {
+      var sheetUndangan = ss.getSheetByName("Daftar_Undangan");
+      var deleted = false;
+      if (sheetUndangan && sheetUndangan.getLastRow() > 1) {
+        var dataRange = sheetUndangan.getRange(2, 1, sheetUndangan.getLastRow() - 1, 8).getValues();
+        for (var d = dataRange.length - 1; d >= 0; d--) {
+          var rowId = String(dataRange[d][0]);
+          var rowName = String(dataRange[d][1]).trim().toLowerCase();
+          if ((data.id && rowId === String(data.id)) || (data.name && rowName === String(data.name).trim().toLowerCase())) {
+            sheetUndangan.deleteRow(d + 2);
+            deleted = true;
+          }
+        }
+      }
+      return sendJsonResponse({ status: "success", type: "guest_deleted", id: data.id, deleted: deleted });
+    }
+
+    // G. ACTION: KOSONGKAN SELURUH DAFTAR TAMU (CLEAR_ALL_GUESTS)
+    if (data.action === "CLEAR_ALL_GUESTS") {
+      var sheetUndangan = ss.getSheetByName("Daftar_Undangan");
+      if (sheetUndangan && sheetUndangan.getLastRow() > 1) {
+        sheetUndangan.deleteRows(2, sheetUndangan.getLastRow() - 1);
+      }
+      return sendJsonResponse({ status: "success", type: "guests_cleared" });
+    }
+
+    // H. ACTION: SIMPAN PENGATURAN ACARA (Informasi Mempelai, Tanggal, Tempat, dll.)
     if (data.action === "SAVE_EVENT_SETTINGS" && data.settings) {
       var sheetPengaturan = getOrCreateSheet(ss, "Pengaturan_Acara");
       sheetPengaturan.clear();

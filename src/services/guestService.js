@@ -1,7 +1,11 @@
-// Guest List & Barcode Management Service with Excel (.xlsx/.xls/.csv) Support
 import * as XLSX from 'xlsx';
 import { getAppState, setAppState } from './db';
-import { syncGuestToGoogle, syncAllGuestsToGoogle } from './googleSync';
+import { 
+  syncGuestToGoogle, 
+  syncAllGuestsToGoogle,
+  deleteGuestFromGoogle,
+  clearAllGuestsFromGoogle 
+} from './googleSync';
 
 const GUEST_STORAGE_KEY = 'hema_guest_list_master';
 
@@ -88,17 +92,32 @@ export async function addGuest({ name, category, pax, table, notes }) {
   return newGuest;
 }
 
-// Delete a guest
+// Delete a guest (Lokal + Google Spreadsheet)
 export async function deleteGuest(id) {
   const current = await getAllGuests();
+  const target = current.find((g) => g.id === id);
   const updated = current.filter((g) => g.id !== id);
   await saveAllGuests(updated);
+
+  if (target) {
+    try {
+      await deleteGuestFromGoogle(target.id, target.name);
+    } catch (err) {
+      console.warn('Gagal menghapus tamu dari Google Spreadsheet:', err);
+    }
+  }
+
   return updated;
 }
 
-// Clear all guests
+// Clear all guests (Lokal + Google Spreadsheet)
 export async function clearAllGuests() {
   await saveAllGuests([]);
+  try {
+    await clearAllGuestsFromGoogle();
+  } catch (err) {
+    console.warn('Gagal mengosongkan tamu di Google Spreadsheet:', err);
+  }
   return [];
 }
 
@@ -209,23 +228,38 @@ export function downloadGuestTemplateExcel() {
   XLSX.writeFile(wb, 'Template_Daftar_Tamu_HeMa_Wedding.xlsx');
 }
 
-// Merge cloud guests from Google Spreadsheet
+// Merge and reconcile cloud guests from Google Spreadsheet (Source of Truth)
 export async function mergeCloudGuests(cloudGuests) {
   if (!Array.isArray(cloudGuests)) return 0;
   const current = await getAllGuests();
-  const currentMap = new Map();
-  for (const g of current) {
-    const key = g.id || g.name;
-    currentMap.set(key, g);
+
+  // Jika Google Spreadsheet kosong dan di aplikasi lokal masih ada tamu:
+  // Berarti pengguna telah menghapus seluruh daftar tamu di Google Spreadsheet!
+  if (cloudGuests.length === 0) {
+    if (current.length > 0) {
+      await saveAllGuests([]);
+      return current.length;
+    }
+    return 0;
   }
 
-  let updatedCount = 0;
+  const localMap = new Map();
+  for (const g of current) {
+    const key = g.id || g.name;
+    localMap.set(key, g);
+    if (g.name) localMap.set(g.name.trim().toLowerCase(), g);
+  }
+
+  // Bangun daftar tamu berdasarkan data resmi dari Google Spreadsheet
+  const resultList = [];
+  let isDifferent = false;
+
   for (const cg of cloudGuests) {
     if (!cg || !cg.name) continue;
-    const key = cg.id || cg.name;
-    const existing = currentMap.get(key);
+    const existing = localMap.get(cg.id) || localMap.get(cg.name) || localMap.get(cg.name.trim().toLowerCase());
+
     if (!existing) {
-      currentMap.set(key, {
+      resultList.push({
         id: cg.id || `GST_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
         name: cg.name,
         category: cg.category || 'Tamu Undangan',
@@ -235,21 +269,45 @@ export async function mergeCloudGuests(cloudGuests) {
         checkedIn: cg.checkedIn || false,
         checkedInAt: cg.checkedInAt || null,
       });
-      updatedCount++;
+      isDifferent = true;
     } else {
-      // Update check-in status from cloud if changed
-      if (cg.checkedIn !== undefined && existing.checkedIn !== cg.checkedIn) {
-        existing.checkedIn = cg.checkedIn;
-        existing.checkedInAt = cg.checkedInAt || existing.checkedInAt;
-        updatedCount++;
+      const isCheckedIn = cg.checkedIn !== undefined ? cg.checkedIn : existing.checkedIn;
+      const checkinTime = cg.checkedInAt || existing.checkedInAt || null;
+
+      if (
+        existing.name !== cg.name ||
+        existing.category !== (cg.category || existing.category) ||
+        existing.pax !== (cg.pax || existing.pax) ||
+        existing.table !== (cg.table || existing.table) ||
+        existing.checkedIn !== isCheckedIn
+      ) {
+        isDifferent = true;
       }
+
+      resultList.push({
+        ...existing,
+        name: cg.name,
+        category: cg.category || existing.category,
+        pax: cg.pax || existing.pax,
+        table: cg.table || existing.table,
+        qrToken: cg.qrToken || existing.qrToken,
+        checkedIn: isCheckedIn,
+        checkedInAt: checkinTime,
+      });
     }
   }
 
-  if (updatedCount > 0 || (current.length === 0 && cloudGuests.length > 0)) {
-    const mergedList = Array.from(currentMap.values());
-    await saveAllGuests(mergedList);
+  // Jika ada tamu di lokal yang tidak lagi ada di Google Spreadsheet,
+  // berarti tamu tersebut telah dihapus oleh pengguna dari spreadsheet!
+  if (current.length !== resultList.length) {
+    isDifferent = true;
   }
-  return updatedCount;
+
+  if (isDifferent) {
+    await saveAllGuests(resultList);
+    return resultList.length;
+  }
+
+  return 0;
 }
 

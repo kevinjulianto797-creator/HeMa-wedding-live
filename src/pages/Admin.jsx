@@ -113,6 +113,13 @@ export function Admin({ setActivePage }) {
   useEffect(() => {
     if (isAuthenticated) {
       loadData();
+      const handleSync = () => loadData();
+      window.addEventListener('wedding-guests-updated', handleSync);
+      window.addEventListener('wedding-sync-completed', handleSync);
+      return () => {
+        window.removeEventListener('wedding-guests-updated', handleSync);
+        window.removeEventListener('wedding-sync-completed', handleSync);
+      };
     }
   }, [isAuthenticated]);
 
@@ -234,7 +241,13 @@ export function Admin({ setActivePage }) {
   const [linkCopied, setLinkCopied] = useState(false);
   const [cleanLinkCopied, setCleanLinkCopied] = useState(false);
   const [shareQrDataUrl, setShareQrDataUrl] = useState('');
-  const [rawDateValue, setRawDateValue] = useState('');
+  const [rawDateValue, setRawDateValue] = useState(() => {
+    const s = getWeddingSettings();
+    if (s.weddingDateRaw) {
+      return s.weddingDateRaw.includes('T') ? s.weddingDateRaw.split('T')[0] : s.weddingDateRaw;
+    }
+    return '';
+  });
   const [akadStartTime, setAkadStartTime] = useState('08:00');
   const [akadEndTime, setAkadEndTime] = useState('10:00');
   const [recStartTime, setRecStartTime] = useState('11:00');
@@ -266,6 +279,7 @@ export function Admin({ setActivePage }) {
       const formatted = `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
       setWeddingForm((prev) => ({
         ...prev,
+        weddingDateRaw: val,
         weddingDateFormatted: formatted
       }));
     } catch (err) {

@@ -328,6 +328,60 @@ export async function syncAllGuestsToGoogle(guests) {
   return { success: true };
 }
 
+// 8b. Hapus Satu Tamu dari Google Sheet (Daftar_Undangan)
+export async function deleteGuestFromGoogle(guestId, guestName) {
+  const settings = getGoogleSettings();
+  if (!settings.sheetsWebhookUrl || !settings.sheetsWebhookUrl.startsWith('http')) {
+    return { success: false };
+  }
+
+  const payload = {
+    action: 'DELETE_GUEST',
+    id: guestId,
+    name: guestName,
+  };
+
+  try {
+    await fetch(settings.sheetsWebhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+      mode: 'no-cors',
+    });
+    addAuditLog('GUEST', `Tamu "${guestName || guestId}" dihapus dari Google Sheet.`);
+    return { success: true };
+  } catch (err) {
+    console.warn('Gagal menghapus tamu di Google:', err);
+    return { success: false, error: err };
+  }
+}
+
+// 8c. Kosongkan Seluruh Tamu dari Google Sheet (Daftar_Undangan)
+export async function clearAllGuestsFromGoogle() {
+  const settings = getGoogleSettings();
+  if (!settings.sheetsWebhookUrl || !settings.sheetsWebhookUrl.startsWith('http')) {
+    return { success: false };
+  }
+
+  const payload = {
+    action: 'CLEAR_ALL_GUESTS',
+  };
+
+  try {
+    await fetch(settings.sheetsWebhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+      mode: 'no-cors',
+    });
+    addAuditLog('GUEST', 'Seluruh data tamu di Google Sheet Daftar_Undangan telah dikosongkan.');
+    return { success: true };
+  } catch (err) {
+    console.warn('Gagal mengosongkan tamu di Google:', err);
+    return { success: false, error: err };
+  }
+}
+
 // 9. Sync Event Settings (Pengantin, Tanggal, Venue, dll.) to Google Sheet
 export async function syncEventSettingsToGoogle(eventSettings) {
   const settings = getGoogleSettings();
