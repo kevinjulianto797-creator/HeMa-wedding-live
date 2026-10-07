@@ -260,3 +260,70 @@ export async function testGoogleConnection(url) {
   addAuditLog('TEST', 'Tes pengiriman baris ke Google Sheets berhasil dikirim!');
   return { success: true };
 }
+
+// 7. Sync Guest to Google Sheet (Daftar_Undangan)
+export async function syncGuestToGoogle(guest) {
+  const settings = getGoogleSettings();
+  if (!settings.sheetsWebhookUrl || !settings.sheetsWebhookUrl.startsWith('http')) {
+    console.warn('Google Webhook URL belum diisi untuk sinkronisasi tamu.');
+    return { success: false };
+  }
+
+  const payload = {
+    action: 'ADD_GUEST',
+    id: guest.id,
+    name: guest.name,
+    category: guest.category || 'Tamu Undangan',
+    pax: guest.pax || 1,
+    table: guest.table || 'Meja Reguler',
+    qrToken: guest.qrToken || '-',
+    checkedIn: guest.checkedIn || false,
+    checkedInAt: guest.checkedInAt || null,
+  };
+
+  try {
+    await fetch(settings.sheetsWebhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+      mode: 'no-cors',
+    });
+    addAuditLog('GUEST', `Tamu "${guest.name}" (${guest.category}) didaftarkan ke Google Sheet.`);
+    return { success: true };
+  } catch (err) {
+    console.warn('Gagal sync guest to Google:', err);
+    return { success: false, error: err };
+  }
+}
+
+// 8. Sync Batch Guests to Google Sheet (Daftar_Undangan)
+export async function syncAllGuestsToGoogle(guests) {
+  const settings = getGoogleSettings();
+  if (!settings.sheetsWebhookUrl || !settings.sheetsWebhookUrl.startsWith('http')) {
+    throw new Error('URL Webhook Google Apps Script belum dikonfigurasi.');
+  }
+
+  const payload = {
+    action: 'SYNC_ALL_GUESTS',
+    guests: (guests || []).map((g) => ({
+      id: g.id,
+      name: g.name,
+      category: g.category || 'Tamu Undangan',
+      pax: g.pax || 1,
+      table: g.table || 'Meja Reguler',
+      qrToken: g.qrToken || '-',
+      checkedIn: g.checkedIn || false,
+      checkedInAt: g.checkedInAt || null,
+    })),
+  };
+
+  await fetch(settings.sheetsWebhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload),
+    mode: 'no-cors',
+  });
+
+  addAuditLog('GUEST', `${guests.length} tamu disinkronkan ke Google Sheet Daftar_Undangan.`);
+  return { success: true };
+}

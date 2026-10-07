@@ -1,6 +1,7 @@
 // Guest List & Barcode Management Service with Excel (.xlsx/.xls/.csv) Support
 import * as XLSX from 'xlsx';
 import { getAppState, setAppState } from './db';
+import { syncGuestToGoogle, syncAllGuestsToGoogle } from './googleSync';
 
 const GUEST_STORAGE_KEY = 'hema_guest_list_master';
 
@@ -76,6 +77,14 @@ export async function addGuest({ name, category, pax, table, notes }) {
 
   const updated = [newGuest, ...current];
   await saveAllGuests(updated);
+
+  // Otomatis sinkronkan tamu baru ke sheet Daftar_Undangan di Google Spreadsheet
+  try {
+    await syncGuestToGoogle(newGuest);
+  } catch (err) {
+    console.warn('Sync guest to Google failed:', err);
+  }
+
   return newGuest;
 }
 
@@ -174,6 +183,14 @@ export async function importGuestsFromExcelFile(file) {
   const current = await getAllGuests();
   const merged = [...parsedGuests, ...current];
   await saveAllGuests(merged);
+
+  // Otomatis sinkronkan seluruh tamu hasil impor ke Google Spreadsheet
+  try {
+    await syncAllGuestsToGoogle(parsedGuests);
+  } catch (err) {
+    console.warn('Sync imported guests to Google failed:', err);
+  }
+
   return parsedGuests;
 }
 

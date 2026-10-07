@@ -45,7 +45,8 @@ import {
   exportCheckinsToCSV, 
   exportWishesToCSV,
   getSyncLogs,
-  testGoogleConnection 
+  testGoogleConnection,
+  syncAllGuestsToGoogle 
 } from '../services/googleSync';
 import { getAllCheckins, getAllWishes, getAllMoments } from '../services/db';
 import { 
@@ -87,6 +88,7 @@ export function Admin({ setActivePage }) {
   // Excel File Upload State
   const [selectedExcelFile, setSelectedExcelFile] = useState(null);
   const [isImportingExcel, setIsImportingExcel] = useState(false);
+  const [isSyncingGuests, setIsSyncingGuests] = useState(false);
   const [excelSuccessMsg, setExcelSuccessMsg] = useState('');
   const fileInputRef = useRef(null);
 
@@ -140,13 +142,30 @@ export function Admin({ setActivePage }) {
       table: newGuestTable,
     });
 
-    setGuestSuccessMsg(`Tamu "${created.name}" berhasil ditambahkan dengan Token Barcode: ${created.qrToken}`);
+    setGuestSuccessMsg(`Tamu "${created.name}" berhasil ditambahkan & disinkronkan ke Google Spreadsheet!`);
     setNewGuestName('');
     setNewGuestPax(1);
     setNewGuestTable('Meja Reguler');
     await loadData();
 
     setTimeout(() => setGuestSuccessMsg(''), 4000);
+  };
+
+  const handleSyncAllGuestsToGoogle = async () => {
+    if (guestList.length === 0) {
+      alert('Belum ada tamu yang terdaftar.');
+      return;
+    }
+    setIsSyncingGuests(true);
+    try {
+      await syncAllGuestsToGoogle(guestList);
+      setGuestSuccessMsg(`✅ Berhasil menyinkronkan seluruh (${guestList.length}) tamu ke Google Spreadsheet (sheet Daftar_Undangan)!`);
+      setTimeout(() => setGuestSuccessMsg(''), 5000);
+    } catch (err) {
+      alert('Gagal menyinkronkan: ' + (err.message || 'Periksa URL Webhook Google di Tab Integrasi Google.'));
+    } finally {
+      setIsSyncingGuests(false);
+    }
   };
 
   // 2. Upload & Parse Excel File (.xlsx, .xls, .csv)
@@ -862,6 +881,19 @@ export function Admin({ setActivePage }) {
                     className="bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-navy-600 focus:bg-white transition"
                   />
                 </div>
+                {guestList.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleSyncAllGuestsToGoogle}
+                    disabled={isSyncingGuests}
+                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition shrink-0 shadow-xs disabled:opacity-50"
+                    title="Kirim & sinkronkan seluruh daftar tamu ke Google Spreadsheet (sheet Daftar_Undangan)"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isSyncingGuests ? 'animate-spin' : ''}`} />
+                    <span className="hidden sm:inline">{isSyncingGuests ? 'Menyinkronkan...' : 'Sinkron ke Spreadsheet'}</span>
+                    <span className="sm:hidden">{isSyncingGuests ? 'Sync...' : 'Sync'}</span>
+                  </button>
+                )}
                 {guestList.length > 0 && (
                   <button
                     type="button"

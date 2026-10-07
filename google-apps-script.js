@@ -251,6 +251,74 @@ function doPost(e) {
       });
     }
 
+    // D. ACTION: TAMBAH TAMU / DAFTAR TAMU BARU (ADD_GUEST)
+    if (data.action === "ADD_GUEST") {
+      var sheetUndangan = getOrCreateSheetWithHeaders(ss, "Daftar_Undangan", [
+        ["ID Tamu", "Nama Tamu", "Kategori", "Pax", "Meja", "Token QR", "Status Hadir", "Jam Kehadiran"]
+      ]);
+
+      sheetUndangan.appendRow([
+        data.id || ("GUEST-" + Date.now()),
+        data.name || "Tamu Undangan",
+        data.category || "Tamu Undangan",
+        Number(data.pax || 1),
+        data.table || "Meja Reguler",
+        data.qrToken || "-",
+        data.checkedIn ? "Hadir" : "Belum Hadir",
+        data.checkedInAt || "-"
+      ]);
+
+      return sendJsonResponse({ status: "success", type: "guest_added", id: data.id });
+    }
+
+    // E. ACTION: SYNC MASSAL DAFTAR TAMU (SYNC_ALL_GUESTS)
+    if (data.action === "SYNC_ALL_GUESTS") {
+      var sheetUndangan = getOrCreateSheetWithHeaders(ss, "Daftar_Undangan", [
+        ["ID Tamu", "Nama Tamu", "Kategori", "Pax", "Meja", "Token QR", "Status Hadir", "Jam Kehadiran"]
+      ]);
+
+      var guestsArray = data.guests || [];
+      var addedCount = 0;
+
+      if (Array.isArray(guestsArray) && guestsArray.length > 0) {
+        var existingData = sheetUndangan.getDataRange().getValues();
+        var existingIds = {};
+        for (var i = 1; i < existingData.length; i++) {
+          if (existingData[i][0]) existingIds[String(existingData[i][0])] = true;
+          if (existingData[i][1]) existingIds[String(existingData[i][1]).toLowerCase().trim()] = true;
+        }
+
+        var rowsToAdd = [];
+        for (var g = 0; g < guestsArray.length; g++) {
+          var item = guestsArray[g];
+          var itemId = String(item.id || "");
+          var itemName = String(item.name || "").toLowerCase().trim();
+          if (!existingIds[itemId] && !existingIds[itemName]) {
+            rowsToAdd.push([
+              item.id || ("GUEST-" + Date.now() + "_" + g),
+              item.name || "Tamu Undangan",
+              item.category || "Tamu Undangan",
+              Number(item.pax || 1),
+              item.table || "Meja Reguler",
+              item.qrToken || "-",
+              item.checkedIn ? "Hadir" : "Belum Hadir",
+              item.checkedInAt || "-"
+            ]);
+            existingIds[itemId] = true;
+            existingIds[itemName] = true;
+          }
+        }
+
+        if (rowsToAdd.length > 0) {
+          var startRow = sheetUndangan.getLastRow() + 1;
+          sheetUndangan.getRange(startRow, 1, rowsToAdd.length, rowsToAdd[0].length).setValues(rowsToAdd);
+          addedCount = rowsToAdd.length;
+        }
+      }
+
+      return sendJsonResponse({ status: "success", type: "guests_synced", added: addedCount });
+    }
+
     return sendJsonResponse({ status: "unknown_action" });
 
   } catch (error) {
@@ -345,11 +413,34 @@ function doGet(e) {
       }
     }
 
+    // D. Ambil Master Tamu Undangan dari sheet Daftar_Undangan
+    var sheetUndangan = ss.getSheetByName("Daftar_Undangan");
+    var guests = [];
+    if (sheetUndangan && sheetUndangan.getLastRow() > 1) {
+      var undanganRows = sheetUndangan.getRange(2, 1, sheetUndangan.getLastRow() - 1, 8).getValues();
+      for (var u = 0; u < undanganRows.length; u++) {
+        var gRow = undanganRows[u];
+        if (gRow[1]) {
+          guests.push({
+            id: String(gRow[0] || ("GUEST-" + u)),
+            name: String(gRow[1]),
+            category: String(gRow[2] || "Tamu Undangan"),
+            pax: Number(gRow[3] || 1),
+            table: String(gRow[4] || "Meja Reguler"),
+            qrToken: String(gRow[5] || "-"),
+            checkedIn: String(gRow[6]) === "Hadir",
+            checkedInAt: gRow[7] ? String(gRow[7]) : null,
+          });
+        }
+      }
+    }
+
     return sendJsonResponse({
       status: "success",
       moments: moments,
       wishes: wishes,
-      checkins: checkins
+      checkins: checkins,
+      guests: guests
     });
 
   } catch (err) {
