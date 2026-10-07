@@ -16,7 +16,9 @@ import {
   FolderOpen,
   Clock,
   RefreshCw,
-  Play
+  Play,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { INITIAL_MOMENTS } from '../services/mockData';
 import { getAllMoments, saveMoment, updateMomentLikes, markMomentSynced } from '../services/db';
@@ -180,16 +182,78 @@ export function Moments() {
 
   // Handle Like with optimistic update
   const handleLike = async (id, e) => {
-    e.stopPropagation();
+    if (e) e.stopPropagation();
     try {
       await updateMomentLikes(id, 1);
       setMoments((prev) =>
         prev.map((m) => (m.id === id ? { ...m, likes: (m.likes || 0) + 1 } : m))
       );
+      if (lightboxMoment && lightboxMoment.id === id) {
+        setLightboxMoment((prev) => (prev ? { ...prev, likes: (prev.likes || 0) + 1 } : prev));
+      }
     } catch (err) {
       console.error('Like error:', err);
     }
   };
+
+  // Navigasi Lightbox (Next / Prev & Swipe geser layar di HP)
+  const currentLightboxIndex = lightboxMoment
+    ? filteredMoments.findIndex((m) => m.id === lightboxMoment.id)
+    : -1;
+  const hasPrev = currentLightboxIndex > 0;
+  const hasNext = currentLightboxIndex >= 0 && currentLightboxIndex < filteredMoments.length - 1;
+
+  const showPrevMoment = () => {
+    if (hasPrev) {
+      setLightboxMoment(filteredMoments[currentLightboxIndex - 1]);
+    }
+  };
+
+  const showNextMoment = () => {
+    if (hasNext) {
+      setLightboxMoment(filteredMoments[currentLightboxIndex + 1]);
+    }
+  };
+
+  // Touch swipe support (geser layar di HP layaknya Google Drive)
+  const touchStartXRef = useRef(null);
+  const touchStartYRef = useRef(null);
+
+  const handleTouchStart = (e) => {
+    touchStartXRef.current = e.touches[0].clientX;
+    touchStartYRef.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e) => {
+    if (touchStartXRef.current === null) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
+    const diffX = touchStartXRef.current - touchEndX;
+    const diffY = touchStartYRef.current - touchEndY;
+
+    // Geser horizontal dominan & jarak geser > 40px
+    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 40) {
+      if (diffX > 0) {
+        showNextMoment();
+      } else {
+        showPrevMoment();
+      }
+    }
+    touchStartXRef.current = null;
+    touchStartYRef.current = null;
+  };
+
+  // Keyboard navigation (Panah Kiri/Kanan & Esc)
+  useEffect(() => {
+    if (!lightboxMoment) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'ArrowLeft') showPrevMoment();
+      else if (e.key === 'ArrowRight') showNextMoment();
+      else if (e.key === 'Escape') setLightboxMoment(null);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxMoment, currentLightboxIndex, hasPrev, hasNext, filteredMoments]);
 
   // Trigger handlers with quota validation
   const handleOpenInAppCamera = () => {
@@ -786,20 +850,64 @@ export function Moments() {
         </div>
       )}
 
-      {/* FULLSCREEN LIGHTBOX MODAL */}
+      {/* FULLSCREEN LIGHTBOX MODAL WITH SWIPE / CAROUSEL */}
       {lightboxMoment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-950/95 backdrop-blur-xl p-2 sm:p-6 animate-fade-in">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-navy-950/95 backdrop-blur-xl p-2 sm:p-6 animate-fade-in select-none"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          {/* Index Counter Badge */}
+          {filteredMoments.length > 1 && currentLightboxIndex >= 0 && (
+            <div className="absolute top-4 left-4 z-50 px-3 py-1.5 rounded-full bg-navy-900/85 border border-white/20 text-white text-xs font-semibold backdrop-blur-md shadow-lg">
+              {currentLightboxIndex + 1} / {filteredMoments.length}
+            </div>
+          )}
+
+          {/* Close Button */}
           <button
             onClick={() => setLightboxMoment(null)}
-            className="absolute top-4 right-4 z-50 p-2.5 rounded-full bg-navy-900/80 text-white hover:bg-navy-800 border border-white/20 transition"
+            className="absolute top-4 right-4 z-50 p-2.5 rounded-full bg-navy-900/85 text-white hover:bg-navy-800 border border-white/20 transition active:scale-95 shadow-lg"
+            aria-label="Tutup"
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
 
-          <div className="relative max-w-4xl max-h-[90vh] flex flex-col items-center">
+          {/* Prev Arrow */}
+          {hasPrev && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                showPrevMoment();
+              }}
+              className="absolute left-2 sm:left-6 top-1/2 -translate-y-1/2 z-50 p-2 sm:p-3 rounded-full bg-navy-900/85 hover:bg-navy-800 text-white border border-white/20 shadow-2xl transition active:scale-90 flex items-center justify-center backdrop-blur-md"
+              aria-label="Momen Sebelumnya"
+              title="Sebelumnya (←)"
+            >
+              <ChevronLeft className="w-6 h-6 sm:w-7 sm:h-7" />
+            </button>
+          )}
+
+          {/* Next Arrow */}
+          {hasNext && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                showNextMoment();
+              }}
+              className="absolute right-2 sm:right-6 top-1/2 -translate-y-1/2 z-50 p-2 sm:p-3 rounded-full bg-navy-900/85 hover:bg-navy-800 text-white border border-white/20 shadow-2xl transition active:scale-90 flex items-center justify-center backdrop-blur-md"
+              aria-label="Momen Selanjutnya"
+              title="Selanjutnya (→)"
+            >
+              <ChevronRight className="w-6 h-6 sm:w-7 sm:h-7" />
+            </button>
+          )}
+
+          {/* Media Content */}
+          <div className="relative w-full max-w-4xl max-h-[92vh] flex flex-col items-center justify-center px-1 sm:px-12">
             {lightboxMoment.type === 'video' ? (
               isGoogleDriveVideo(lightboxMoment.previewUrl) ? (
-                <div className="w-[92vw] max-w-3xl aspect-video rounded-2xl overflow-hidden shadow-2xl bg-black border border-navy-700">
+                <div className="w-[94vw] sm:w-full max-w-2xl h-[52vh] sm:h-[65vh] md:h-[70vh] rounded-2xl overflow-hidden shadow-2xl bg-black border border-navy-700 flex items-center justify-center">
                   <iframe
                     src={getDriveEmbedUrl(lightboxMoment.previewUrl)}
                     className="w-full h-full border-0"
@@ -814,42 +922,63 @@ export function Moments() {
                   controls
                   autoPlay
                   playsInline
-                  className="max-h-[75vh] w-auto max-w-full rounded-2xl shadow-2xl border border-navy-700 bg-black"
+                  className="max-h-[52vh] sm:max-h-[65vh] md:max-h-[70vh] w-auto max-w-full rounded-2xl shadow-2xl border border-navy-700 bg-black object-contain"
                 />
               )
             ) : (
               <img
                 src={lightboxMoment.previewUrl}
                 alt={lightboxMoment.caption}
-                className="max-h-[75vh] w-auto object-contain rounded-2xl shadow-2xl border border-navy-700"
+                className="max-h-[52vh] sm:max-h-[65vh] md:max-h-[70vh] w-auto max-w-full object-contain rounded-2xl shadow-2xl border border-navy-700"
               />
             )}
 
-            <div className="w-full max-w-xl mt-4 bg-white p-4 rounded-2xl border border-slate-200 flex items-center justify-between gap-4 shadow-xl">
-              <div>
-                <p className="text-xs sm:text-sm font-semibold text-navy-950">
+            {/* Bottom Info Card */}
+            <div className="w-full max-w-xl mt-3 sm:mt-4 bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 flex items-center justify-between gap-3 shadow-xl">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm font-semibold text-navy-950 truncate">
                   {lightboxMoment.caption}
                 </p>
-                <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
-                  <span className="text-navy-800 font-bold">{lightboxMoment.uploaderName}</span>
+                <div className="flex items-center gap-2 text-[11px] sm:text-xs text-slate-500 mt-0.5">
+                  <span className="text-navy-800 font-bold truncate max-w-[120px]">
+                    {lightboxMoment.uploaderName}
+                  </span>
                   <span>•</span>
                   <span>{new Date(lightboxMoment.timestamp).toLocaleTimeString('id-ID')}</span>
                 </div>
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
+                {/* Like Button */}
+                <button
+                  onClick={(e) => handleLike(lightboxMoment.id, e)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition active:scale-95 text-xs font-semibold"
+                  title="Sukai Momen Ini"
+                >
+                  <Heart className="w-4 h-4 fill-rose-500 text-rose-500" />
+                  <span>{lightboxMoment.likes || 0}</span>
+                </button>
+
+                {/* Download Button */}
                 <a
                   href={lightboxMoment.previewUrl}
                   download="Wedding_Moment.jpg"
                   target="_blank"
                   rel="noreferrer"
                   className="p-2 rounded-xl bg-navy-950 hover:bg-navy-900 text-white transition shadow-sm"
-                  title="Unduh Foto Resolusi Asli"
+                  title="Unduh Resolusi Asli"
                 >
-                  <Download className="w-5 h-5" />
+                  <Download className="w-4 h-4 sm:w-5 sm:h-5" />
                 </a>
               </div>
             </div>
+
+            {/* Mobile swipe gesture tip */}
+            {filteredMoments.length > 1 && (
+              <p className="text-[11px] text-white/60 mt-2 sm:hidden text-center flex items-center justify-center gap-1">
+                <span>← Geser layar ke kiri / kanan untuk momen lain →</span>
+              </p>
+            )}
           </div>
         </div>
       )}
