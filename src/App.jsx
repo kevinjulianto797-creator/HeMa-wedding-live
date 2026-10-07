@@ -10,6 +10,7 @@ import { Photographer } from './pages/Photographer';
 import { LiveScreen } from './pages/LiveScreen';
 import { syncService } from './services/syncService';
 import { WifiOff } from 'lucide-react';
+import { SyncQueueBanner } from './components/SyncQueueBanner';
 
 export function App() {
   const [activePage, setActivePage] = useState('home');
@@ -73,6 +74,7 @@ export function App() {
 
       {/* Page Content Container */}
       <main className="flex-1 max-w-4xl w-full mx-auto px-4 pt-4 sm:pt-6">
+        <SyncQueueBanner />
         {activePage === 'home' && <Home setActivePage={handlePageChange} />}
         {activePage === 'checkin' && <CheckIn setActivePage={handlePageChange} />}
         {activePage === 'moments' && <Moments setActivePage={handlePageChange} />}

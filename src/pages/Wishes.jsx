@@ -98,20 +98,22 @@ export function Wishes() {
         synced: false,
       };
 
-      await saveWish(newWish);
+      const savedWish = await saveWish(newWish);
       await loadWishes();
 
       setMessageText('');
       setSenderName('');
       triggerWishCelebration();
 
-      // Kirim langsung ke Google Sheets & Drive
-      syncWishToGoogle(newWish)
-        .then(() => markWishSynced(newWish.id))
-        .catch((err) => console.warn('Direct wish sync failed, will retry:', err));
-
+      // Kirim langsung ke Google Sheets & Drive jika online
       if (isOnline) {
-        syncService.syncAll();
+        try {
+          await syncWishToGoogle(savedWish);
+          await markWishSynced(savedWish.id);
+          await loadWishes();
+        } catch (err) {
+          console.warn('Direct wish sync failed, will retry in background:', err);
+        }
       }
     } catch (err) {
       console.error('Submit wish error:', err);
@@ -134,20 +136,22 @@ export function Wishes() {
         synced: false,
       };
 
-      await saveWish(newWish);
+      const savedWish = await saveWish(newWish);
       await loadWishes();
 
       setSenderName('');
       setActiveFormTab('text');
       triggerWishCelebration();
 
-      // Kirim langsung ke Google Sheets & Drive
-      syncWishToGoogle(newWish)
-        .then(() => markWishSynced(newWish.id))
-        .catch((err) => console.warn('Direct voice note sync failed, will retry:', err));
-
+      // Kirim langsung ke Google Sheets & Drive jika online
       if (isOnline) {
-        syncService.syncAll();
+        try {
+          await syncWishToGoogle(savedWish);
+          await markWishSynced(savedWish.id);
+          await loadWishes();
+        } catch (err) {
+          console.warn('Direct voice note sync failed, will retry in background:', err);
+        }
       }
     } catch (err) {
       console.error('Submit voice note error:', err);
@@ -360,12 +364,12 @@ export function Wishes() {
                 </p>
               )}
 
-              {/* Offline indicator if queued */}
-              {!item.synced && (
+              {/* Indikator hanya jika perangkat benar-benar offline dan belum tersinkron */}
+              {!isOnline && !item.synced && (
                 <div className="pt-1 flex items-center justify-end">
                   <span className="text-[10px] text-amber-700 font-medium flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                    <span>Tersimpan di perangkat (Offline)</span>
+                    <span>Tersimpan di HP (Menunggu Sinyal)</span>
                   </span>
                 </div>
               )}

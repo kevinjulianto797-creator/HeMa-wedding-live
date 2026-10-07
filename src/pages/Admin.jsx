@@ -214,7 +214,7 @@ export function Admin({ setActivePage }) {
     })
       .then((res) => setShareQrDataUrl(res))
       .catch((err) => console.error('Error generating share QR:', err));
-  }, [weddingForm]);
+  }, [weddingForm, googleForm]);
 
   const handleDateChange = (e) => {
     const val = e.target.value;

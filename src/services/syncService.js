@@ -36,6 +36,15 @@ class SyncService {
         console.warn('⚠️ [SyncService] Sinyal offline! Mode penyimpanan lokal aktif.');
       });
 
+      // Jalankan auto-sync awal jika online untuk mengirim antrean yang tersimpan sebelumnya
+      if (this.isOnline) {
+        setTimeout(() => this.syncAll(), 2500);
+      }
+
+      window.addEventListener('wedding-settings-updated', () => {
+        if (this.isOnline) this.syncAll();
+      });
+
       // Polling berkala setiap 7 detik untuk menarik foto, ucapan, dan checkin baru dari Google Sheets & Drive
       setInterval(() => {
         if (this.isOnline && !this.isSyncing) {
@@ -86,28 +95,40 @@ class SyncService {
       // 1. Sync pending check-ins to Cloud/Google Sheets
       const pendingCheckins = await getPendingCheckins();
       for (const item of pendingCheckins) {
-        console.log(`[SyncService] Mengirim antrean checkin: ${item.guestName}`);
-        await syncCheckinToGoogle(item);
-        await markCheckinSynced(item.id);
+        try {
+          console.log(`[SyncService] Mengirim antrean checkin: ${item.guestName}`);
+          await syncCheckinToGoogle(item);
+          await markCheckinSynced(item.id);
+        } catch (errCheckin) {
+          console.warn('Gagal sync checkin:', errCheckin);
+        }
       }
 
       // 2. Sync pending wishes (text & voice note) to Cloud/Google Sheets & Drive
       const pendingWishes = await getPendingWishes();
       for (const item of pendingWishes) {
-        console.log(`[SyncService] Mengirim antrean ucapan: ${item.senderName}`);
-        await syncWishToGoogle(item);
-        await markWishSynced(item.id);
+        try {
+          console.log(`[SyncService] Mengirim antrean ucapan: ${item.senderName}`);
+          await syncWishToGoogle(item);
+          await markWishSynced(item.id);
+        } catch (errWish) {
+          console.warn('Gagal sync ucapan:', errWish);
+        }
       }
 
-      // 3. Sync pending moments (photos/videos) to Cloudflare R2 & Google Drive
+      // 3. Sync pending moments (photos/videos) to Google Drive & Sheets
       const pendingMoments = await getPendingMoments();
       for (const item of pendingMoments) {
-        console.log(`[SyncService] Mengirim antrean foto/video: ${item.caption}`);
-        await syncMediaToGoogle(item);
-        await markMomentSynced(item.id);
+        try {
+          console.log(`[SyncService] Mengirim antrean foto/video: ${item.caption}`);
+          await syncMediaToGoogle(item);
+          await markMomentSynced(item.id);
+        } catch (errMedia) {
+          console.warn('Gagal sync media:', errMedia);
+        }
       }
 
-      console.log('✅ [SyncService] Seluruh data offline berhasil disinkronisasi!');
+      console.log('✅ [SyncService] Seluruh data antrean selesai diproses!');
       await this.pullFromCloud();
       window.dispatchEvent(new CustomEvent('wedding-sync-completed'));
     } catch (error) {

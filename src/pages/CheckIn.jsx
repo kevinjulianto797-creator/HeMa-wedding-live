@@ -126,14 +126,14 @@ export function CheckIn() {
     setSuccessGuest(updated);
     triggerCelebration();
 
-    // Kirim langsung ke Google Sheets
-    syncCheckinToGoogle(checkinPayload)
-      .then(() => markCheckinSynced(savedCheckin.id))
-      .catch((err) => console.warn('Direct checkin sync failed, will retry:', err));
-
-    // Trigger sync if online
+    // Kirim langsung ke Google Sheets jika online
     if (isOnline) {
-      syncService.syncAll();
+      try {
+        await syncCheckinToGoogle(savedCheckin);
+        await markCheckinSynced(savedCheckin.id);
+      } catch (err) {
+        console.warn('Direct checkin sync failed, will retry in background:', err);
+      }
     }
   };
 

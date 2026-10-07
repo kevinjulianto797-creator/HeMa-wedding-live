@@ -13,7 +13,9 @@ import {
   CheckCircle2, 
   AlertCircle,
   Smartphone,
-  FolderOpen
+  FolderOpen,
+  Clock,
+  RefreshCw
 } from 'lucide-react';
 import { INITIAL_MOMENTS } from '../services/mockData';
 import { getAllMoments, saveMoment, updateMomentLikes, markMomentSynced } from '../services/db';
@@ -21,6 +23,7 @@ import { syncService } from '../services/syncService';
 import { syncMediaToGoogle } from '../services/googleSync';
 import { getWeddingSettings } from '../services/weddingSettings';
 import { InAppCameraModal } from '../components/InAppCameraModal';
+import { compressImage } from '../utils/imageCompressor';
 
 export function Moments() {
   const [weddingSettings] = useState(getWeddingSettings());
@@ -161,14 +164,15 @@ export function Moments() {
   };
 
   // Handle photo from in-app camera modal
-  const handleInAppPhotoCaptured = ({ file, previewUrl }) => {
+  const handleInAppPhotoCaptured = async ({ file, previewUrl }) => {
     if (uploadQuota.photos >= MAX_PHOTOS_PER_GUEST) {
       alert(`Batas maksimal ${MAX_PHOTOS_PER_GUEST} foto telah tercapai.`);
       return;
     }
+    const optimizedUrl = await compressImage(previewUrl, 1600, 0.82);
     setMediaFile(file);
     setPreviewMedia({
-      url: previewUrl,
+      url: optimizedUrl,
       type: 'photo',
     });
     setIsUploadOpen(true);
@@ -205,9 +209,13 @@ export function Moments() {
 
     setMediaFile(file);
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
+      let finalUrl = event.target.result;
+      if (!isVideo) {
+        finalUrl = await compressImage(finalUrl, 1600, 0.82);
+      }
       setPreviewMedia({
-        url: event.target.result,
+        url: finalUrl,
         type: isVideo ? 'video' : 'photo',
       });
       setIsUploadOpen(true);
@@ -241,7 +249,7 @@ export function Moments() {
         synced: false,
       };
 
-      await saveMoment(newMoment);
+      const savedMoment = await saveMoment(newMoment);
       await loadMoments();
 
       // Perbarui kuota upload tamu di localStorage
@@ -258,13 +266,15 @@ export function Moments() {
       setCaption('');
       setUploaderName('');
 
-      // Kirim langsung foto / video ke Google Drive & Sheets
-      syncMediaToGoogle(newMoment)
-        .then(() => markMomentSynced(newMoment.id))
-        .catch((err) => console.warn('Direct media sync failed, will retry:', err));
-
+      // Kirim langsung foto / video ke Google Drive & Sheets jika online
       if (isOnline) {
-        syncService.syncAll();
+        try {
+          await syncMediaToGoogle(savedMoment);
+          await markMomentSynced(savedMoment.id);
+          await loadMoments(); // Refresh agar label status langsung bersih
+        } catch (err) {
+          console.warn('Direct media sync failed, will retry via queue:', err);
+        }
       }
     } catch (err) {
       console.error('Upload error:', err);
@@ -433,10 +443,11 @@ export function Moments() {
                 </span>
               )}
 
-              {/* Offline indicator if not synced */}
-              {!item.synced && (
-                <span className="px-2 py-0.5 rounded-full bg-amber-500/90 text-white text-[10px] font-semibold">
-                  Offline
+              {/* Indikator hanya jika perangkat benar-benar offline dan belum tersinkron */}
+              {!isOnline && !item.synced && (
+                <span className="px-2 py-0.5 rounded-full bg-amber-500/90 text-white text-[10px] font-semibold flex items-center gap-1 shadow-sm">
+                  <Clock className="w-2.5 h-2.5" />
+                  <span>Menunggu Sinyal</span>
                 </span>
               )}
             </div>

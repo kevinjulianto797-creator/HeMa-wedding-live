@@ -42,6 +42,10 @@ function blobToBase64(blob) {
 // 1. Sync Checkin to Google Sheet
 export async function syncCheckinToGoogle(checkin) {
   const settings = getGoogleSettings();
+  if (!settings.sheetsWebhookUrl || !settings.sheetsWebhookUrl.startsWith('http')) {
+    throw new Error('URL Webhook Google Apps Script belum dikonfigurasi.');
+  }
+
   const payload = {
     action: 'CHECK_IN',
     timestamp: checkin.timestamp,
@@ -53,18 +57,12 @@ export async function syncCheckinToGoogle(checkin) {
     checkedInBy: checkin.checkedInBy,
   };
 
-  if (settings.sheetsWebhookUrl && settings.sheetsWebhookUrl.startsWith('http')) {
-    try {
-      await fetch(settings.sheetsWebhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload),
-        mode: 'no-cors',
-      });
-    } catch (e) {
-      console.warn('Webhook POST error:', e);
-    }
-  }
+  await fetch(settings.sheetsWebhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload),
+    mode: 'no-cors',
+  });
 
   addAuditLog('CHECK_IN', `${checkin.guestName} (${checkin.category}) tercatat hadir.`);
   return { success: true };
@@ -73,8 +71,11 @@ export async function syncCheckinToGoogle(checkin) {
 // 2. Sync Wish & Voice Note to Google Sheet & Drive
 export async function syncWishToGoogle(wish) {
   const settings = getGoogleSettings();
-  let audioBase64 = null;
+  if (!settings.sheetsWebhookUrl || !settings.sheetsWebhookUrl.startsWith('http')) {
+    throw new Error('URL Webhook Google Apps Script belum dikonfigurasi.');
+  }
 
+  let audioBase64 = null;
   if (wish.audioBlob instanceof Blob) {
     try {
       audioBase64 = await blobToBase64(wish.audioBlob);
@@ -91,21 +92,15 @@ export async function syncWishToGoogle(wish) {
     type: wish.type,
     message: wish.message,
     audioDuration: wish.audioDuration,
-    audioBase64: audioBase64, // Automatically saved to Google Drive 03_Voice_Notes folder!
+    audioBase64: audioBase64, // Saved directly to Google Drive 03_Voice_Notes folder!
   };
 
-  if (settings.sheetsWebhookUrl && settings.sheetsWebhookUrl.startsWith('http')) {
-    try {
-      await fetch(settings.sheetsWebhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload),
-        mode: 'no-cors',
-      });
-    } catch (e) {
-      console.warn('Webhook POST error:', e);
-    }
-  }
+  await fetch(settings.sheetsWebhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload),
+    mode: 'no-cors',
+  });
 
   addAuditLog('WISH', `Ucapan dari ${wish.senderName} [${wish.type.toUpperCase()}] disinkronkan ke Sheet & Drive.`);
   return { success: true };
@@ -114,8 +109,11 @@ export async function syncWishToGoogle(wish) {
 // 3. Sync Moment (Photo/Video) to Google Drive & Sheet
 export async function syncMediaToGoogle(moment) {
   const settings = getGoogleSettings();
-  let fileBase64 = null;
+  if (!settings.sheetsWebhookUrl || !settings.sheetsWebhookUrl.startsWith('http')) {
+    throw new Error('URL Webhook Google Apps Script belum dikonfigurasi.');
+  }
 
+  let fileBase64 = null;
   if (moment.fileBlob instanceof Blob) {
     try {
       fileBase64 = await blobToBase64(moment.fileBlob);
@@ -123,7 +121,6 @@ export async function syncMediaToGoogle(moment) {
       console.warn('Error converting media blob to base64:', err);
     }
   } else if (moment.previewUrl && moment.previewUrl.startsWith('data:')) {
-    // If previewUrl is already a data-url
     fileBase64 = moment.previewUrl.split(',')[1];
   }
 
@@ -139,18 +136,12 @@ export async function syncMediaToGoogle(moment) {
     mimeType: moment.type === 'video' ? 'video/mp4' : 'image/jpeg',
   };
 
-  if (settings.sheetsWebhookUrl && settings.sheetsWebhookUrl.startsWith('http')) {
-    try {
-      await fetch(settings.sheetsWebhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload),
-        mode: 'no-cors',
-      });
-    } catch (e) {
-      console.warn('Webhook POST error:', e);
-    }
-  }
+  await fetch(settings.sheetsWebhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload),
+    mode: 'no-cors',
+  });
 
   addAuditLog('MEDIA', `Media "${moment.caption || 'Foto Momen'}" di-upload oleh ${moment.uploaderName} ke Drive.`);
   return { success: true };
