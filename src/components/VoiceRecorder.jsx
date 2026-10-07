@@ -31,17 +31,36 @@ export function VoiceRecorder({ onRecordingComplete, onCancel }) {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+
+      // Deteksi format audio yang didukung browser (WebM untuk Android/Chrome, MP4/AAC untuk iOS/Safari)
+      let selectedMimeType = '';
+      if (typeof MediaRecorder !== 'undefined' && typeof MediaRecorder.isTypeSupported === 'function') {
+        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+          selectedMimeType = 'audio/webm;codecs=opus';
+        } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+          selectedMimeType = 'audio/webm';
+        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+          selectedMimeType = 'audio/mp4';
+        } else if (MediaRecorder.isTypeSupported('audio/aac')) {
+          selectedMimeType = 'audio/aac';
+        } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
+          selectedMimeType = 'audio/ogg';
+        }
+      }
+
+      const options = selectedMimeType ? { mimeType: selectedMimeType } : {};
+      const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
+      const actualMime = mediaRecorder.mimeType || selectedMimeType || 'audio/webm';
 
       mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
+        if (event.data && event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
       };
 
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioBlob = new Blob(audioChunksRef.current, { type: actualMime });
         recordedBlobRef.current = audioBlob;
         const audioUrl = URL.createObjectURL(audioBlob);
         setRecordedAudioUrl(audioUrl);

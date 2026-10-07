@@ -153,7 +153,7 @@ export function Wishes() {
   };
 
   // Submit Voice Note Wish
-  const handleVoiceRecordingComplete = async ({ audioBlob, audioDuration }) => {
+  const handleVoiceRecordingComplete = async ({ audioBlob, audioDuration, audioUrl }) => {
     try {
       const currentGuest = checkedInGuestName || localStorage.getItem('hema_current_guest_name') || '';
       const newWish = {
@@ -162,6 +162,7 @@ export function Wishes() {
         message: 'Mengirimkan doa melalui rekaman suara (Voice Note)',
         type: 'voice',
         audioBlob,
+        audioUrl: audioUrl || null,
         audioDuration,
         timestamp: new Date().toISOString(),
         synced: false,
@@ -391,6 +392,7 @@ export function Wishes() {
                 <div className="pt-1">
                   <AudioPlayer
                     audioBlob={item.audioBlob}
+                    audioUrl={item.audioUrl}
                     audioDuration={item.audioDuration || 15}
                     isDemo={item.audioSampleType === 'demo'}
                   />

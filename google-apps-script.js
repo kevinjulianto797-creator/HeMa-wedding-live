@@ -205,12 +205,16 @@ function doPost(e) {
       if (data.audioBase64) {
         try {
           var voiceFolder = getVoiceNotesFolder();
-          var fileName = "VN_" + sanitizeName(data.senderName) + "_" + Date.now() + ".webm";
+          var audioMime = data.mimeType || "audio/webm";
+          var ext = audioMime.indexOf("mp4") >= 0 ? ".m4a" : (audioMime.indexOf("ogg") >= 0 ? ".ogg" : ".webm");
+          var fileName = "VN_" + sanitizeName(data.senderName) + "_" + Date.now() + ext;
           var decodedAudio = Utilities.base64Decode(data.audioBase64);
-          var blob = Utilities.newBlob(decodedAudio, "audio/webm", fileName);
+          var blob = Utilities.newBlob(decodedAudio, audioMime, fileName);
           var file = voiceFolder.createFile(blob);
           file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-          driveAudioUrl = file.getUrl();
+          var fileId = file.getId();
+          // Gunakan link streaming langsung agar dapat diputar langsung di tag audio HTML5
+          driveAudioUrl = "https://docs.google.com/uc?export=download&id=" + fileId;
         } catch (errAudio) {
           console.error("Gagal simpan audio ke Drive:", errAudio);
           driveAudioUrl = "(Gagal simpan ke Drive: " + errAudio.toString() + ")";
@@ -241,17 +245,23 @@ function doPost(e) {
         try {
           var targetFolder = getTargetMediaFolder(data.uploaderRole);
           var mime = data.mimeType || "image/jpeg";
-          var ext = mime.indexOf("video") >= 0 ? ".mp4" : ".jpg";
+          var isVideo = mime.indexOf("video") >= 0 || data.type === "video";
+          var ext = isVideo ? ".mp4" : ".jpg";
           var mediaFileName = (data.uploaderRole === "photographer" ? "OFFICIAL_" : "GUEST_") +
             sanitizeName(data.uploaderName) + "_" + Date.now() + ext;
 
           var decodedMedia = Utilities.base64Decode(data.fileBase64);
-          var mediaBlob = Utilities.newBlob(decodedMedia, mime, mediaFileName);
+          var mediaBlob = Utilities.newBlob(decodedMedia, isVideo ? "video/mp4" : mime, mediaFileName);
           var mediaFile = targetFolder.createFile(mediaBlob);
           mediaFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
           fileId = mediaFile.getId();
-          // Gunakan CDN langsung lh3.googleusercontent.com agar gambar dapat langsung tampil di <img> tag semua perangkat tanpa login
-          driveMediaUrl = "https://lh3.googleusercontent.com/d/" + fileId;
+          if (isVideo) {
+            // Gunakan link streaming langsung untuk video agar dapat diputar di tag video HTML5
+            driveMediaUrl = "https://docs.google.com/uc?export=download&id=" + fileId;
+          } else {
+            // Gunakan CDN langsung lh3.googleusercontent.com agar gambar dapat langsung tampil di img tag
+            driveMediaUrl = "https://lh3.googleusercontent.com/d/" + fileId;
+          }
         } catch (errDrive) {
           console.error("Gagal simpan media ke Drive:", errDrive);
           driveMediaUrl = "(Gagal simpan ke Drive: " + errDrive.toString() + ")";
@@ -425,8 +435,13 @@ function doGet(e) {
           var rawUrl = String(row[6]);
           var imgUrl = rawUrl;
           var fileIdMatch = rawUrl.match(/[-\w]{25,}/);
-          if (fileIdMatch && !rawUrl.includes("lh3.googleusercontent.com")) {
-            imgUrl = "https://lh3.googleusercontent.com/d/" + fileIdMatch[0];
+          var isVideo = String(row[5] || "").toLowerCase() === "video";
+          if (fileIdMatch) {
+            if (isVideo) {
+              imgUrl = "https://docs.google.com/uc?export=download&id=" + fileIdMatch[0];
+            } else if (!rawUrl.includes("lh3.googleusercontent.com")) {
+              imgUrl = "https://lh3.googleusercontent.com/d/" + fileIdMatch[0];
+            }
           }
 
           moments.push({
@@ -436,7 +451,7 @@ function doGet(e) {
             uploaderRole: row[2] || "guest",
             category: row[3] || "Momen Bahagia",
             caption: row[4] || "",
-            type: row[5] || "photo",
+            type: isVideo ? "video" : "photo",
             previewUrl: imgUrl,
             likes: 1,
             synced: true
@@ -453,6 +468,13 @@ function doGet(e) {
       for (var j = 0; j < ucapanRows.length; j++) {
         var uRow = ucapanRows[j];
         if (uRow[0]) {
+          var audioRaw = String(uRow[6] || "");
+          var directAudioUrl = audioRaw;
+          var audioIdMatch = audioRaw.match(/[-\w]{25,}/);
+          if (audioIdMatch) {
+            directAudioUrl = "https://docs.google.com/uc?export=download&id=" + audioIdMatch[0];
+          }
+
           wishes.push({
             id: "w_cloud_" + j + "_" + new Date(uRow[0]).getTime(),
             timestamp: new Date(uRow[0]).toISOString(),
@@ -461,7 +483,7 @@ function doGet(e) {
             type: (uRow[3] && String(uRow[3]).indexOf("Voice") >= 0) ? "voice" : "text",
             audioDuration: Number(uRow[4] || 0),
             message: uRow[5] || "",
-            audioUrl: uRow[6] || "",
+            audioUrl: directAudioUrl,
             synced: true
           });
         }

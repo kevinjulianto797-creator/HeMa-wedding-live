@@ -1,49 +1,74 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Volume2 } from 'lucide-react';
 
-export function AudioPlayer({ audioBlob, audioDuration = 15, isDemo = false }) {
+export function AudioPlayer({ audioBlob, audioUrl: propAudioUrl, audioDuration = 15, isDemo = false }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const audioRef = useRef(null);
-  const [audioUrl, setAudioUrl] = useState(null);
+  const [playableSrc, setPlayableSrc] = useState(null);
   const timerRef = useRef(null);
 
   useEffect(() => {
+    let objectUrl = null;
     if (audioBlob instanceof Blob) {
-      const url = URL.createObjectURL(audioBlob);
-      setAudioUrl(url);
-      return () => URL.revokeObjectURL(url);
+      objectUrl = URL.createObjectURL(audioBlob);
+      setPlayableSrc(objectUrl);
+    } else if (typeof audioBlob === 'string' && audioBlob.length > 0) {
+      setPlayableSrc(audioBlob);
+    } else if (propAudioUrl) {
+      setPlayableSrc(propAudioUrl);
+    } else {
+      setPlayableSrc(null);
     }
-  }, [audioBlob]);
+
+    return () => {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [audioBlob, propAudioUrl]);
 
   const togglePlay = () => {
-    if (audioRef.current && audioUrl) {
+    if (audioRef.current && playableSrc) {
       if (isPlaying) {
         audioRef.current.pause();
         setIsPlaying(false);
       } else {
-        audioRef.current.play();
-        setIsPlaying(true);
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              setIsPlaying(true);
+            })
+            .catch((err) => {
+              console.warn('Audio play failed:', err);
+              // Fallback to simulated animation if audio stream is blocked or unavailable
+              runSimulatedTimer();
+            });
+        }
       }
     } else {
-      // Demo simulated playback for sample wishes
-      if (isPlaying) {
-        clearInterval(timerRef.current);
-        setIsPlaying(false);
-      } else {
-        setIsPlaying(true);
-        setCurrentTime(0);
-        timerRef.current = setInterval(() => {
-          setCurrentTime((prev) => {
-            if (prev >= audioDuration) {
-              clearInterval(timerRef.current);
-              setIsPlaying(false);
-              return 0;
-            }
-            return prev + 1;
-          });
-        }, 1000);
-      }
+      runSimulatedTimer();
+    }
+  };
+
+  const runSimulatedTimer = () => {
+    if (isPlaying) {
+      clearInterval(timerRef.current);
+      setIsPlaying(false);
+    } else {
+      setIsPlaying(true);
+      setCurrentTime(0);
+      timerRef.current = setInterval(() => {
+        setCurrentTime((prev) => {
+          if (prev >= audioDuration) {
+            clearInterval(timerRef.current);
+            setIsPlaying(false);
+            return 0;
+          }
+          return prev + 1;
+        });
+      }, 1000);
     }
   };
 
@@ -68,12 +93,14 @@ export function AudioPlayer({ audioBlob, audioDuration = 15, isDemo = false }) {
 
   return (
     <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 flex items-center gap-3">
-      {audioUrl && (
+      {playableSrc && (
         <audio
           ref={audioRef}
-          src={audioUrl}
+          src={playableSrc}
+          preload="auto"
           onTimeUpdate={handleTimeUpdate}
           onEnded={handleEnded}
+          onError={(e) => console.warn('Audio element error:', e)}
           className="hidden"
         />
       )}

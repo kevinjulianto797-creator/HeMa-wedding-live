@@ -83,6 +83,7 @@ export async function saveWish(wish) {
     message: wish.message || '',
     type: wish.type || 'text', // 'text' | 'voice'
     audioBlob: wish.audioBlob || null, // Blob saved directly in IndexedDB!
+    audioUrl: wish.audioUrl || null,
     audioDuration: wish.audioDuration || 0,
     timestamp: wish.timestamp || new Date().toISOString(),
     synced: wish.synced ?? false,
@@ -187,17 +188,42 @@ export async function mergeCloudMoments(cloudMoments) {
   // Amankan momen lokal yang masih antre upload (synced: false)
   const pendingLocal = localMoments.filter(m => m.synced === false);
 
+  // Buat map pencarian data lokal untuk mempertahankan media asli (Blob / Data URL)
+  const localMap = new Map();
+  for (const lm of localMoments) {
+    if (lm.id) localMap.set(lm.id, lm);
+    if (lm.previewUrl) localMap.set(lm.previewUrl, lm);
+    if (lm.timestamp && lm.uploaderName) localMap.set(`${lm.timestamp}_${lm.uploaderName}`, lm);
+  }
+
   const cloudMap = new Map();
   for (const cm of cloudMoments) {
     const key = cm.previewUrl || `${cm.timestamp}_${cm.uploaderName}`;
+    const existingLocal = localMap.get(key) || localMap.get(`${cm.timestamp}_${cm.uploaderName}`) || localMap.get(cm.id);
+
+    // Untuk video di Google Drive, pastikan linknya streamable
+    let mediaUrl = cm.previewUrl;
+    if (cm.type === 'video' && mediaUrl) {
+      const fileIdMatch = mediaUrl.match(/[-\w]{25,}/);
+      if (fileIdMatch && !mediaUrl.startsWith('data:') && !mediaUrl.startsWith('blob:')) {
+        mediaUrl = `https://docs.google.com/uc?export=download&id=${fileIdMatch[0]}`;
+      }
+    }
+
+    // Jika di lokal sudah ada data URL base64/blob lokal, utamakan data lokal agar pemutaran instan tanpa buffer
+    const finalUrl = (existingLocal?.previewUrl && (existingLocal.previewUrl.startsWith('data:') || existingLocal.previewUrl.startsWith('blob:')))
+      ? existingLocal.previewUrl
+      : (mediaUrl || existingLocal?.previewUrl);
+
     cloudMap.set(key, {
       id: cm.id || `mmt_cloud_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
       caption: cm.caption || '',
       uploaderName: cm.uploaderName || 'Tamu Undangan',
       uploaderRole: cm.uploaderRole || 'guest',
-      type: cm.type || 'photo',
+      type: cm.type || existingLocal?.type || 'photo',
       category: cm.category || 'Momen Bahagia',
-      previewUrl: cm.previewUrl,
+      previewUrl: finalUrl,
+      fileBlob: existingLocal?.fileBlob || null,
       likes: cm.likes || 1,
       timestamp: cm.timestamp || new Date().toISOString(),
       synced: true,
@@ -227,18 +253,36 @@ export async function mergeCloudWishes(cloudWishes) {
 
   const pendingLocal = localWishes.filter(w => w.synced === false);
 
+  // Buat map pencarian data lokal untuk mempertahankan rekaman suara asli (audioBlob)
+  const localMap = new Map();
+  for (const lw of localWishes) {
+    if (lw.id) localMap.set(lw.id, lw);
+    if (lw.timestamp && lw.senderName) localMap.set(`${lw.timestamp}_${lw.senderName}`, lw);
+  }
+
   const cloudMap = new Map();
   for (const cw of cloudWishes) {
     const key = `${cw.timestamp}_${cw.senderName}`;
+    const existingLocal = localMap.get(key) || localMap.get(cw.id);
+
+    // Pastikan link audio Drive dapat di-stream langsung
+    let audioUrl = cw.audioUrl || existingLocal?.audioUrl || null;
+    if (audioUrl) {
+      const audioIdMatch = audioUrl.match(/[-\w]{25,}/);
+      if (audioIdMatch && !audioUrl.startsWith('data:') && !audioUrl.startsWith('blob:')) {
+        audioUrl = `https://docs.google.com/uc?export=download&id=${audioIdMatch[0]}`;
+      }
+    }
+
     cloudMap.set(key, {
       id: cw.id || `wsh_cloud_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
       senderName: cw.senderName || 'Tamu Undangan',
       relationship: cw.relationship || 'Teman',
       message: cw.message || '',
-      type: cw.type || 'text',
-      audioBlob: null,
-      audioUrl: cw.audioUrl || null,
-      audioDuration: cw.audioDuration || 0,
+      type: cw.type || (audioUrl || existingLocal?.audioBlob ? 'voice' : 'text'),
+      audioBlob: existingLocal?.audioBlob || null, // Pertahankan audioBlob lokal asli!
+      audioUrl: audioUrl,
+      audioDuration: cw.audioDuration || existingLocal?.audioDuration || 0,
       timestamp: cw.timestamp || new Date().toISOString(),
       synced: true,
     });

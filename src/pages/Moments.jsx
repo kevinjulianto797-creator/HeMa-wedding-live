@@ -15,7 +15,8 @@ import {
   Smartphone,
   FolderOpen,
   Clock,
-  RefreshCw
+  RefreshCw,
+  Play
 } from 'lucide-react';
 import { INITIAL_MOMENTS } from '../services/mockData';
 import { getAllMoments, saveMoment, updateMomentLikes, markMomentSynced } from '../services/db';
@@ -274,6 +275,7 @@ export function Moments() {
         type: previewMedia.type,
         category: category,
         previewUrl: previewMedia.url,
+        fileBlob: mediaFile || null,
         likes: 1,
         timestamp: new Date().toISOString(),
         synced: false,
@@ -450,12 +452,30 @@ export function Moments() {
             className="group relative rounded-2xl overflow-hidden bg-white border border-slate-200/90 cursor-pointer shadow-sm hover:shadow-md hover:border-navy-300 transition duration-300 aspect-[4/5] flex flex-col justify-end"
           >
             {/* Image / Video preview */}
-            <img
-              src={item.previewUrl}
-              alt={item.caption}
-              className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition duration-500"
-              loading="lazy"
-            />
+            {item.type === 'video' ? (
+              <div className="absolute inset-0 w-full h-full bg-slate-900 overflow-hidden">
+                <video
+                  src={item.previewUrl}
+                  className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                  preload="metadata"
+                  muted
+                  playsInline
+                />
+                {/* Play Button Indicator */}
+                <div className="absolute inset-0 flex items-center justify-center bg-black/25 group-hover:bg-black/10 transition">
+                  <div className="w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center text-navy-950 shadow-md group-hover:scale-110 transition">
+                    <Play className="w-5 h-5 fill-navy-950 ml-0.5" />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <img
+                src={item.previewUrl}
+                alt={item.caption}
+                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                loading="lazy"
+              />
+            )}
 
             {/* Gradient Overlay for high text readability */}
             <div className="absolute inset-0 bg-gradient-to-t from-navy-950/90 via-navy-950/25 to-transparent" />
@@ -744,11 +764,21 @@ export function Moments() {
           </button>
 
           <div className="relative max-w-4xl max-h-[90vh] flex flex-col items-center">
-            <img
-              src={lightboxMoment.previewUrl}
-              alt={lightboxMoment.caption}
-              className="max-h-[75vh] w-auto object-contain rounded-2xl shadow-2xl border border-navy-700"
-            />
+            {lightboxMoment.type === 'video' ? (
+              <video
+                src={lightboxMoment.previewUrl}
+                controls
+                autoPlay
+                playsInline
+                className="max-h-[75vh] w-auto max-w-full rounded-2xl shadow-2xl border border-navy-700 bg-black"
+              />
+            ) : (
+              <img
+                src={lightboxMoment.previewUrl}
+                alt={lightboxMoment.caption}
+                className="max-h-[75vh] w-auto object-contain rounded-2xl shadow-2xl border border-navy-700"
+              />
+            )}
 
             <div className="w-full max-w-xl mt-4 bg-white p-4 rounded-2xl border border-slate-200 flex items-center justify-between gap-4 shadow-xl">
               <div>
