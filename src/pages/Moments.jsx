@@ -70,7 +70,20 @@ export function Moments() {
   };
 
   // Form upload state
-  const [uploaderName, setUploaderName] = useState('');
+  const [checkedInGuestName, setCheckedInGuestName] = useState(() => {
+    try {
+      return localStorage.getItem('hema_current_guest_name') || '';
+    } catch {
+      return '';
+    }
+  });
+  const [uploaderName, setUploaderName] = useState(() => {
+    try {
+      return localStorage.getItem('hema_current_guest_name') || '';
+    } catch {
+      return '';
+    }
+  });
   const [caption, setCaption] = useState('');
   const [category, setCategory] = useState('Selfie Tamu');
   const [previewMedia, setPreviewMedia] = useState(null);
@@ -85,6 +98,20 @@ export function Moments() {
   useEffect(() => {
     loadMoments();
 
+    const savedGuest = localStorage.getItem('hema_current_guest_name') || '';
+    if (savedGuest) {
+      setCheckedInGuestName(savedGuest);
+      setUploaderName((prev) => prev || savedGuest);
+    }
+
+    const handleGuestCheckIn = (e) => {
+      const name = e.detail?.name || localStorage.getItem('hema_current_guest_name') || '';
+      if (name) {
+        setCheckedInGuestName(name);
+        setUploaderName(name);
+      }
+    };
+
     const unsubscribe = syncService.subscribe((status) => {
       setIsOnline(status.isOnline);
     });
@@ -94,10 +121,12 @@ export function Moments() {
     };
 
     window.addEventListener('wedding-sync-completed', handleSyncComplete);
+    window.addEventListener('wedding-guest-checked-in', handleGuestCheckIn);
 
     return () => {
       unsubscribe();
       window.removeEventListener('wedding-sync-completed', handleSyncComplete);
+      window.removeEventListener('wedding-guest-checked-in', handleGuestCheckIn);
     };
   }, []);
 
@@ -237,9 +266,10 @@ export function Moments() {
     setIsUploading(true);
 
     try {
+      const currentGuest = checkedInGuestName || localStorage.getItem('hema_current_guest_name') || '';
       const newMoment = {
         caption: caption || `Momen Bahagia Bersama ${weddingSettings.coupleTitle || 'Mempelai'}`,
-        uploaderName: uploaderName.trim() || 'Tamu Undangan',
+        uploaderName: uploaderName.trim() || currentGuest || 'Tamu Undangan',
         uploaderRole: 'guest',
         type: previewMedia.type,
         category: category,
@@ -264,7 +294,7 @@ export function Moments() {
       setPreviewMedia(null);
       setMediaFile(null);
       setCaption('');
-      setUploaderName('');
+      setUploaderName(currentGuest || '');
 
       // Kirim langsung foto / video ke Google Drive & Sheets jika online
       if (isOnline) {
@@ -621,16 +651,27 @@ export function Moments() {
             {/* Form details (only show when previewMedia is ready) */}
             {previewMedia && (
               <form onSubmit={handleUploadSubmit} className="space-y-4 pt-1">
-                {/* Uploader Name (Opsional) */}
+                {/* Uploader Name */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Nama Anda (Opsional)
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      {checkedInGuestName ? 'Nama Pengunggah' : 'Nama Anda (Opsional)'}
+                    </label>
+                    {checkedInGuestName ? (
+                      <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        ✓ Terisi Otomatis (Tamu Hadir)
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-400">
+                        Belum scan / konfirmasi hadir
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="text"
                     value={uploaderName}
                     onChange={(e) => setUploaderName(e.target.value)}
-                    placeholder="Contoh: Rian & Nisa (Kosongkan untuk Tamu Undangan)"
+                    placeholder={checkedInGuestName || "Contoh: Rian & Nisa (Kosongkan untuk Tamu Undangan)"}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-navy-600 focus:bg-white transition"
                   />
                 </div>

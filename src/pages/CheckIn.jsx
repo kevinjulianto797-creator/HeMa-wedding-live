@@ -119,6 +119,17 @@ export function CheckIn() {
     // Save to IndexedDB (Works online AND offline!)
     const savedCheckin = await saveCheckin(checkinPayload);
 
+    // Simpan identitas tamu yang hadir di perangkat ini untuk otomatisasi nama saat unggah foto/video/ucapan
+    if (guest.name) {
+      localStorage.setItem('hema_current_guest_name', guest.name);
+      localStorage.setItem('hema_current_guest_id', String(guest.id));
+      try {
+        window.dispatchEvent(new CustomEvent('wedding-guest-checked-in', { detail: guest }));
+      } catch (e) {
+        // ignore
+      }
+    }
+
     const newGuestList = guests.map(g => g.id === guest.id ? updated : g);
     setGuests(newGuestList);
     await setAppState('guest_list', newGuestList);

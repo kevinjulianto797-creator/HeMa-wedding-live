@@ -2,6 +2,30 @@
 
 const SETTINGS_STORAGE_KEY = 'hema_wedding_settings';
 
+export function formatWeddingDateDisplay(val) {
+  if (!val) return 'Minggu, 18 Oktober 2026';
+  const str = String(val).trim();
+  // Jika sudah berformat nama hari & bulan Indonesia (tanpa huruf T / Z / ISO)
+  if ((str.includes('Januari') || str.includes('Februari') || str.includes('Maret') || str.includes('April') || 
+       str.includes('Mei') || str.includes('Juni') || str.includes('Juli') || str.includes('Agustus') || 
+       str.includes('September') || str.includes('Oktober') || str.includes('November') || str.includes('Desember')) && 
+      !str.includes('T') && !str.includes('Z')) {
+    return str;
+  }
+  // Parsing jika berupa ISO string (contoh: 2027-01-02T17:00:00.000Z atau 2026-10-18)
+  try {
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+      const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+      return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+    }
+  } catch (e) {
+    console.warn('Error formatting wedding date:', e);
+  }
+  return str;
+}
+
 export const DEFAULT_WEDDING_SETTINGS = {
   groomName: 'Cecep',
   brideName: 'Memey',
@@ -146,6 +170,7 @@ export function getWeddingSettings() {
       }
     }
 
+    settings.weddingDateFormatted = formatWeddingDateDisplay(settings.weddingDateFormatted);
     return settings;
   } catch (err) {
     console.error('Error reading wedding settings:', err);
@@ -157,6 +182,8 @@ export function saveWeddingSettings(newSettings) {
   try {
     const groom = newSettings.groomName || 'Cecep';
     const bride = newSettings.brideName || 'Memey';
+    const rawDate = newSettings.weddingDateFormatted || '';
+    const formattedDate = formatWeddingDateDisplay(rawDate);
     const updated = {
       ...getWeddingSettings(),
       ...newSettings,
@@ -164,6 +191,7 @@ export function saveWeddingSettings(newSettings) {
       brideName: bride,
       coupleTitle: `${groom} & ${bride}`,
       initials: newSettings.initials || `${groom[0] || 'C'}${bride[0] || 'M'}`.toUpperCase(),
+      weddingDateFormatted: formattedDate,
     };
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(updated));
 

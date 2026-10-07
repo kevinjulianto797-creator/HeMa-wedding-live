@@ -78,16 +78,16 @@ export function Navbar({ activePage, setActivePage }) {
     <header className="sticky top-0 z-40 w-full bg-white/95 border-b border-navy-100/80 backdrop-blur-md shadow-sm">
       <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center justify-between">
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Tombol Kembali (Muncul saat tidak di halaman Beranda) */}
+          {/* Tombol Kembali (Cukup panah tanpa teks agar tidak penuh) */}
           {activePage !== 'home' && (
             <button
               type="button"
               onClick={() => setActivePage('home')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-navy-950 text-xs font-bold transition border border-slate-200 shadow-xs group"
+              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-navy-950 transition border border-slate-200 shadow-xs group shrink-0"
               title="Kembali ke Beranda"
+              aria-label="Kembali ke Beranda"
             >
-              <ArrowLeft className="w-3.5 h-3.5 text-navy-900 group-hover:-translate-x-0.5 transition" />
-              <span>Kembali</span>
+              <ArrowLeft className="w-4 h-4 text-navy-900 group-hover:-translate-x-0.5 transition" />
             </button>
           )}
 

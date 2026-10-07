@@ -70,24 +70,27 @@ function setupDatabase() {
     
     // 1. Sheet: Kehadiran (Check-in Realtime)
     var sheetHadir = getOrCreateSheet(ss, "Kehadiran");
-    sheetHadir.clear();
-    var hadirHeaders = [["Timestamp", "ID Tamu", "Nama Tamu", "Kategori", "Pax", "Meja", "Metode Checkin"]];
-    sheetHadir.getRange(1, 1, 1, hadirHeaders[0].length).setValues(hadirHeaders);
-    formatSheetHeader(sheetHadir, hadirHeaders[0].length);
+    if (sheetHadir.getLastRow() === 0) {
+      var hadirHeaders = [["Timestamp", "ID Tamu", "Nama Tamu", "Kategori", "Pax", "Meja", "Metode Checkin"]];
+      sheetHadir.getRange(1, 1, 1, hadirHeaders[0].length).setValues(hadirHeaders);
+      formatSheetHeader(sheetHadir, hadirHeaders[0].length);
+    }
 
     // 2. Sheet: Ucapan_Doa (Teks & Voice Note)
     var sheetUcapan = getOrCreateSheet(ss, "Ucapan_Doa");
-    sheetUcapan.clear();
-    var ucapanHeaders = [["Timestamp", "Nama Pengirim", "Hubungan", "Tipe", "Durasi VN (detik)", "Pesan Doa / Transkrip", "Link File Audio di Drive"]];
-    sheetUcapan.getRange(1, 1, 1, ucapanHeaders[0].length).setValues(ucapanHeaders);
-    formatSheetHeader(sheetUcapan, ucapanHeaders[0].length);
+    if (sheetUcapan.getLastRow() === 0) {
+      var ucapanHeaders = [["Timestamp", "Nama Pengirim", "Hubungan", "Tipe", "Durasi VN (detik)", "Pesan Doa / Transkrip", "Link File Audio di Drive"]];
+      sheetUcapan.getRange(1, 1, 1, ucapanHeaders[0].length).setValues(ucapanHeaders);
+      formatSheetHeader(sheetUcapan, ucapanHeaders[0].length);
+    }
 
     // 3. Sheet: Galeri_Media (Foto & Video Fotografer & Tamu)
     var sheetMedia = getOrCreateSheet(ss, "Galeri_Media");
-    sheetMedia.clear();
-    var mediaHeaders = [["Timestamp", "Nama Pengunggah", "Peran (Role)", "Kategori Momen", "Caption / Cerita", "Tipe Media", "Link File di Google Drive"]];
-    sheetMedia.getRange(1, 1, 1, mediaHeaders[0].length).setValues(mediaHeaders);
-    formatSheetHeader(sheetMedia, mediaHeaders[0].length);
+    if (sheetMedia.getLastRow() === 0) {
+      var mediaHeaders = [["Timestamp", "Nama Pengunggah", "Peran (Role)", "Kategori Momen", "Caption / Cerita", "Tipe Media", "Link File di Google Drive"]];
+      sheetMedia.getRange(1, 1, 1, mediaHeaders[0].length).setValues(mediaHeaders);
+      formatSheetHeader(sheetMedia, mediaHeaders[0].length);
+    }
 
     // 4. Sheet: Daftar_Undangan (Master Tamu)
     var sheetUndangan = getOrCreateSheet(ss, "Daftar_Undangan");
@@ -487,7 +490,7 @@ function doGet(e) {
     var sheetPengaturan = ss.getSheetByName("Pengaturan_Acara");
     var eventSettings = null;
     if (sheetPengaturan && sheetPengaturan.getLastRow() > 1) {
-      var setRows = sheetPengaturan.getRange(2, 1, sheetPengaturan.getLastRow() - 1, 2).getValues();
+      var setRows = sheetPengaturan.getRange(2, 1, sheetPengaturan.getLastRow() - 1, 2).getDisplayValues();
       eventSettings = {};
       for (var sIdx = 0; sIdx < setRows.length; sIdx++) {
         var k = String(setRows[sIdx][0]);

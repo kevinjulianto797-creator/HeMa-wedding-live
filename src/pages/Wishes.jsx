@@ -23,7 +23,20 @@ export function Wishes() {
   const [weddingSettings] = useState(getWeddingSettings());
   const [wishes, setWishes] = useState(INITIAL_WISHES);
   const [activeFormTab, setActiveFormTab] = useState('text'); // 'text' | 'voice'
-  const [senderName, setSenderName] = useState('');
+  const [checkedInGuestName, setCheckedInGuestName] = useState(() => {
+    try {
+      return localStorage.getItem('hema_current_guest_name') || '';
+    } catch {
+      return '';
+    }
+  });
+  const [senderName, setSenderName] = useState(() => {
+    try {
+      return localStorage.getItem('hema_current_guest_name') || '';
+    } catch {
+      return '';
+    }
+  });
   const [relationship, setRelationship] = useState('Sahabat');
   const [messageText, setMessageText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,6 +47,20 @@ export function Wishes() {
   useEffect(() => {
     loadWishes();
 
+    const savedGuest = localStorage.getItem('hema_current_guest_name') || '';
+    if (savedGuest) {
+      setCheckedInGuestName(savedGuest);
+      setSenderName((prev) => prev || savedGuest);
+    }
+
+    const handleGuestCheckIn = (e) => {
+      const name = e.detail?.name || localStorage.getItem('hema_current_guest_name') || '';
+      if (name) {
+        setCheckedInGuestName(name);
+        setSenderName(name);
+      }
+    };
+
     const unsubscribe = syncService.subscribe((status) => {
       setIsOnline(status.isOnline);
     });
@@ -43,10 +70,12 @@ export function Wishes() {
     };
 
     window.addEventListener('wedding-sync-completed', handleSyncComplete);
+    window.addEventListener('wedding-guest-checked-in', handleGuestCheckIn);
 
     return () => {
       unsubscribe();
       window.removeEventListener('wedding-sync-completed', handleSyncComplete);
+      window.removeEventListener('wedding-guest-checked-in', handleGuestCheckIn);
     };
   }, []);
 
@@ -88,8 +117,9 @@ export function Wishes() {
 
     setIsSubmitting(true);
     try {
+      const currentGuest = checkedInGuestName || localStorage.getItem('hema_current_guest_name') || '';
       const newWish = {
-        senderName: senderName.trim() || 'Tamu Undangan',
+        senderName: senderName.trim() || currentGuest || 'Tamu Undangan',
         relationship,
         message: messageText.trim(),
         type: 'text',
@@ -102,7 +132,7 @@ export function Wishes() {
       await loadWishes();
 
       setMessageText('');
-      setSenderName('');
+      setSenderName(currentGuest || '');
       triggerWishCelebration();
 
       // Kirim langsung ke Google Sheets & Drive jika online
@@ -125,8 +155,9 @@ export function Wishes() {
   // Submit Voice Note Wish
   const handleVoiceRecordingComplete = async ({ audioBlob, audioDuration }) => {
     try {
+      const currentGuest = checkedInGuestName || localStorage.getItem('hema_current_guest_name') || '';
       const newWish = {
-        senderName: senderName.trim() || 'Tamu Undangan (Suara)',
+        senderName: senderName.trim() || currentGuest || 'Tamu Undangan (Suara)',
         relationship,
         message: 'Mengirimkan doa melalui rekaman suara (Voice Note)',
         type: 'voice',
@@ -139,7 +170,7 @@ export function Wishes() {
       const savedWish = await saveWish(newWish);
       await loadWishes();
 
-      setSenderName('');
+      setSenderName(currentGuest || '');
       setActiveFormTab('text');
       triggerWishCelebration();
 
@@ -204,14 +235,25 @@ export function Wishes() {
         {/* Sender Name & Relationship Inputs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Nama Anda (Opsional)
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-semibold text-slate-700">
+                {checkedInGuestName ? 'Nama Anda' : 'Nama Anda (Opsional)'}
+              </label>
+              {checkedInGuestName ? (
+                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  ✓ Terisi Otomatis (Tamu Hadir)
+                </span>
+              ) : (
+                <span className="text-[10px] text-slate-400">
+                  Belum scan / konfirmasi hadir
+                </span>
+              )}
+            </div>
             <input
               type="text"
               value={senderName}
               onChange={(e) => setSenderName(e.target.value)}
-              placeholder="Contoh: Budi Santoso (Kosongkan untuk Tamu Undangan)"
+              placeholder={checkedInGuestName || "Contoh: Budi Santoso (Kosongkan untuk Tamu Undangan)"}
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-navy-600 focus:bg-white transition"
             />
           </div>
