@@ -135,11 +135,16 @@ export function VoiceRecorder({ onRecordingComplete, onCancel }) {
 
   const handleSend = () => {
     if (recordedBlobRef.current) {
-      onRecordingComplete({
-        audioBlob: recordedBlobRef.current,
-        audioDuration: recordingDuration,
-        audioUrl: recordedAudioUrl,
-      });
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64DataUri = reader.result;
+        onRecordingComplete({
+          audioBlob: recordedBlobRef.current,
+          audioDuration: recordingDuration,
+          audioUrl: base64DataUri, // Permanent Data URI yang tidak akan kedaluwarsa atau di-revoke
+        });
+      };
+      reader.readAsDataURL(recordedBlobRef.current);
     }
   };
 

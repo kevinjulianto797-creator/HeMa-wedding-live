@@ -26,6 +26,30 @@ import { getWeddingSettings } from '../services/weddingSettings';
 import { InAppCameraModal } from '../components/InAppCameraModal';
 import { compressImage } from '../utils/imageCompressor';
 
+// Helper pemutaran & thumbnail video dari Google Drive
+const isGoogleDriveVideo = (url) => {
+  if (!url || typeof url !== 'string') return false;
+  return url.includes('drive.google.com') || url.includes('docs.google.com') || url.includes('googleusercontent.com');
+};
+
+const getDriveEmbedUrl = (url) => {
+  if (!url) return '';
+  const match = url.match(/[-\w]{25,}/);
+  if (match) {
+    return `https://drive.google.com/file/d/${match[0]}/preview`;
+  }
+  return url;
+};
+
+const getDriveThumbnail = (url) => {
+  if (!url) return '';
+  const match = url.match(/[-\w]{25,}/);
+  if (match) {
+    return `https://drive.google.com/thumbnail?id=${match[0]}&sz=w800`;
+  }
+  return '';
+};
+
 export function Moments() {
   const [weddingSettings] = useState(getWeddingSettings());
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'photographer' | 'guest'
@@ -454,16 +478,25 @@ export function Moments() {
             {/* Image / Video preview */}
             {item.type === 'video' ? (
               <div className="absolute inset-0 w-full h-full bg-slate-900 overflow-hidden">
-                <video
-                  src={item.previewUrl}
-                  className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-                  preload="metadata"
-                  muted
-                  playsInline
-                />
+                {item.thumbnailUrl || isGoogleDriveVideo(item.previewUrl) ? (
+                  <img
+                    src={item.thumbnailUrl || getDriveThumbnail(item.previewUrl)}
+                    alt={item.caption}
+                    className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                    loading="lazy"
+                  />
+                ) : (
+                  <video
+                    src={item.previewUrl}
+                    className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                    preload="metadata"
+                    muted
+                    playsInline
+                  />
+                )}
                 {/* Play Button Indicator */}
-                <div className="absolute inset-0 flex items-center justify-center bg-black/25 group-hover:bg-black/10 transition">
-                  <div className="w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center text-navy-950 shadow-md group-hover:scale-110 transition">
+                <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/15 transition">
+                  <div className="w-11 h-11 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center text-navy-950 shadow-md group-hover:scale-110 transition">
                     <Play className="w-5 h-5 fill-navy-950 ml-0.5" />
                   </div>
                 </div>
@@ -765,13 +798,25 @@ export function Moments() {
 
           <div className="relative max-w-4xl max-h-[90vh] flex flex-col items-center">
             {lightboxMoment.type === 'video' ? (
-              <video
-                src={lightboxMoment.previewUrl}
-                controls
-                autoPlay
-                playsInline
-                className="max-h-[75vh] w-auto max-w-full rounded-2xl shadow-2xl border border-navy-700 bg-black"
-              />
+              isGoogleDriveVideo(lightboxMoment.previewUrl) ? (
+                <div className="w-[92vw] max-w-3xl aspect-video rounded-2xl overflow-hidden shadow-2xl bg-black border border-navy-700">
+                  <iframe
+                    src={getDriveEmbedUrl(lightboxMoment.previewUrl)}
+                    className="w-full h-full border-0"
+                    allow="autoplay; encrypted-media; fullscreen"
+                    allowFullScreen
+                    title={lightboxMoment.caption || 'Video Momen'}
+                  />
+                </div>
+              ) : (
+                <video
+                  src={lightboxMoment.previewUrl}
+                  controls
+                  autoPlay
+                  playsInline
+                  className="max-h-[75vh] w-auto max-w-full rounded-2xl shadow-2xl border border-navy-700 bg-black"
+                />
+              )
             ) : (
               <img
                 src={lightboxMoment.previewUrl}

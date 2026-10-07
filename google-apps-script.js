@@ -436,11 +436,15 @@ function doGet(e) {
           var imgUrl = rawUrl;
           var fileIdMatch = rawUrl.match(/[-\w]{25,}/);
           var isVideo = String(row[5] || "").toLowerCase() === "video";
+          var thumbUrl = "";
+
           if (fileIdMatch) {
+            var fId = fileIdMatch[0];
+            thumbUrl = "https://drive.google.com/thumbnail?id=" + fId + "&sz=w800";
             if (isVideo) {
-              imgUrl = "https://docs.google.com/uc?export=download&id=" + fileIdMatch[0];
+              imgUrl = "https://drive.google.com/file/d/" + fId + "/preview";
             } else if (!rawUrl.includes("lh3.googleusercontent.com")) {
-              imgUrl = "https://lh3.googleusercontent.com/d/" + fileIdMatch[0];
+              imgUrl = "https://lh3.googleusercontent.com/d/" + fId;
             }
           }
 
@@ -453,6 +457,7 @@ function doGet(e) {
             caption: row[4] || "",
             type: isVideo ? "video" : "photo",
             previewUrl: imgUrl,
+            thumbnailUrl: thumbUrl,
             likes: 1,
             synced: true
           });
@@ -472,7 +477,19 @@ function doGet(e) {
           var directAudioUrl = audioRaw;
           var audioIdMatch = audioRaw.match(/[-\w]{25,}/);
           if (audioIdMatch) {
-            directAudioUrl = "https://docs.google.com/uc?export=download&id=" + audioIdMatch[0];
+            try {
+              var aFile = DriveApp.getFileById(audioIdMatch[0]);
+              // Jika ukuran file audio di bawah 5MB, sajikan Base64 Data URI langsung agar 100% bersuara di browser
+              if (aFile.getSize() < 5000000) {
+                var aBytes = Utilities.base64Encode(aFile.getBlob().getBytes());
+                var aMime = aFile.getMimeType() || "audio/webm";
+                directAudioUrl = "data:" + aMime + ";base64," + aBytes;
+              } else {
+                directAudioUrl = "https://drive.google.com/file/d/" + audioIdMatch[0] + "/preview";
+              }
+            } catch (errAudio) {
+              directAudioUrl = "https://drive.google.com/file/d/" + audioIdMatch[0] + "/preview";
+            }
           }
 
           wishes.push({

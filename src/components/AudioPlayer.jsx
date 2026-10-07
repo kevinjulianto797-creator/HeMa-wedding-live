@@ -10,13 +10,17 @@ export function AudioPlayer({ audioBlob, audioUrl: propAudioUrl, audioDuration =
 
   useEffect(() => {
     let objectUrl = null;
-    if (audioBlob instanceof Blob) {
+    if (propAudioUrl && propAudioUrl.startsWith('data:')) {
+      setPlayableSrc(propAudioUrl);
+    } else if (typeof audioBlob === 'string' && audioBlob.startsWith('data:')) {
+      setPlayableSrc(audioBlob);
+    } else if (audioBlob instanceof Blob) {
       objectUrl = URL.createObjectURL(audioBlob);
       setPlayableSrc(objectUrl);
-    } else if (typeof audioBlob === 'string' && audioBlob.length > 0) {
-      setPlayableSrc(audioBlob);
     } else if (propAudioUrl) {
       setPlayableSrc(propAudioUrl);
+    } else if (typeof audioBlob === 'string' && audioBlob.length > 0) {
+      setPlayableSrc(audioBlob);
     } else {
       setPlayableSrc(null);
     }
