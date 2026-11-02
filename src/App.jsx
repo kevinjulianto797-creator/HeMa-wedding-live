@@ -20,8 +20,11 @@ export function App() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '');
-      if (['home', 'checkin', 'moments', 'wishes', 'admin', 'photographer', 'live'].includes(hash)) {
+      if (['home', 'moments', 'wishes', 'admin', 'photographer', 'live'].includes(hash)) {
         setActivePage(hash);
+      } else if (hash === 'checkin') {
+        setActivePage('home');
+        window.location.hash = 'home';
       }
     };
 
@@ -57,7 +60,7 @@ export function App() {
           <div className="flex items-center gap-2">
             <WifiOff className="w-4 h-4 shrink-0" />
             <span>
-              Koneksi terputus. Mode offline aktif — Anda tetap bisa scan hadir, kirim ucapan, dan foto (otomatis terkirim saat sinyal kembali).
+              Koneksi terputus. Mode offline aktif — Anda tetap bisa kirim ucapan dan foto momen (otomatis terkirim saat sinyal kembali).
             </span>
           </div>
           <button

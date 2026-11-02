@@ -1,23 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  QrCode, 
   MessageSquareHeart, 
   Camera, 
   Clock, 
   MapPin, 
   Sparkles, 
-  Users, 
   Image, 
   Heart,
   ChevronRight
 } from 'lucide-react';
-import { getAllCheckins, getAllWishes, getAllMoments } from '../services/db';
+import { getAllWishes, getAllMoments } from '../services/db';
 import { getWeddingSettings } from '../services/weddingSettings';
 
 export function Home({ setActivePage }) {
   const [settings, setSettings] = useState(getWeddingSettings());
   const [stats, setStats] = useState({
-    checkedInCount: 0,
     momentsCount: 0,
     wishesCount: 0,
   });
@@ -33,14 +30,12 @@ export function Home({ setActivePage }) {
 
     const loadData = async () => {
       try {
-        const [checkins, wishes, moments] = await Promise.all([
-          getAllCheckins(),
+        const [wishes, moments] = await Promise.all([
           getAllWishes(),
           getAllMoments(),
         ]);
 
         setStats({
-          checkedInCount: checkins.length,
           momentsCount: moments.length,
           wishesCount: wishes.length,
         });
@@ -97,36 +92,36 @@ export function Home({ setActivePage }) {
         </div>
       </section>
 
-      {/* 3 Main Action Cards */}
-      <section className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-        {/* Card 1: Check-in Hadir */}
+      {/* 2 Main Action Cards (Khusus Ucapan & Berbagi Momen) */}
+      <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Card 1: Galeri & Berbagi Momen */}
         <div
-          onClick={() => setActivePage('checkin')}
+          onClick={() => setActivePage('moments')}
           className="group cursor-pointer bg-white hover:bg-slate-50/80 p-5 rounded-2xl border border-slate-200 hover:border-navy-400 shadow-sm hover:shadow-md transition duration-300 flex flex-col justify-between"
         >
           <div className="flex items-start justify-between mb-4">
             <div className="w-12 h-12 rounded-xl bg-navy-950 text-white flex items-center justify-center shadow-md group-hover:scale-105 transition">
-              <QrCode className="w-6 h-6" />
+              <Camera className="w-6 h-6" />
             </div>
             <span className="text-[11px] font-semibold text-navy-800 bg-navy-50 px-2.5 py-0.5 rounded-full border border-navy-200">
-              Dual Mode
+              Kamera & Galeri
             </span>
           </div>
           <div>
             <h3 className="font-serif font-bold text-base text-navy-950 group-hover:text-navy-700 transition">
-              Scan Kehadiran
+              Berbagi Momen
             </h3>
             <p className="text-xs text-slate-500 mt-1">
-              Check-in barcode/QR mandiri atau lewat meja resepsionis penerima tamu.
+              Jepret foto langsung di aplikasi, kamera HP, atau unggah momen selfie & video Anda.
             </p>
           </div>
           <div className="flex items-center gap-1 text-xs font-semibold text-navy-900 mt-4 group-hover:translate-x-1 transition">
-            <span>Buka Scanner</span>
+            <span>Buka Galeri Momen</span>
             <ChevronRight className="w-4 h-4" />
           </div>
         </div>
 
-        {/* Card 2: Doa & Voice Note */}
+        {/* Card 2: Doa & Ucapan */}
         <div
           onClick={() => setActivePage('wishes')}
           className="group cursor-pointer bg-white hover:bg-slate-50/80 p-5 rounded-2xl border border-slate-200 hover:border-navy-400 shadow-sm hover:shadow-md transition duration-300 flex flex-col justify-between"
@@ -144,59 +139,22 @@ export function Home({ setActivePage }) {
               Buku Doa & Ucapan
             </h3>
             <p className="text-xs text-slate-500 mt-1">
-              Kirim ucapan selamat pernikahan dengan ketikan pesan atau rekaman suara.
+              Kirim ucapan selamat pernikahan dengan ketikan pesan atau rekaman pesan suara.
             </p>
           </div>
           <div className="flex items-center gap-1 text-xs font-semibold text-navy-900 mt-4 group-hover:translate-x-1 transition">
-            <span>Tulis Doa</span>
-            <ChevronRight className="w-4 h-4" />
-          </div>
-        </div>
-
-        {/* Card 3: Galeri Momen */}
-        <div
-          onClick={() => setActivePage('moments')}
-          className="group cursor-pointer bg-white hover:bg-slate-50/80 p-5 rounded-2xl border border-slate-200 hover:border-navy-400 shadow-sm hover:shadow-md transition duration-300 flex flex-col justify-between"
-        >
-          <div className="flex items-start justify-between mb-4">
-            <div className="w-12 h-12 rounded-xl bg-navy-800 text-white flex items-center justify-center shadow-md group-hover:scale-105 transition">
-              <Camera className="w-6 h-6" />
-            </div>
-            <span className="text-[11px] font-semibold text-navy-800 bg-navy-50 px-2.5 py-0.5 rounded-full border border-navy-200">
-              Kamera & Galeri
-            </span>
-          </div>
-          <div>
-            <h3 className="font-serif font-bold text-base text-navy-950 group-hover:text-navy-700 transition">
-              Galeri & Momen
-            </h3>
-            <p className="text-xs text-slate-500 mt-1">
-              Jepret foto langsung di aplikasi, kamera HP, atau unggah foto selfie Anda.
-            </p>
-          </div>
-          <div className="flex items-center gap-1 text-xs font-semibold text-navy-900 mt-4 group-hover:translate-x-1 transition">
-            <span>Buka Galeri</span>
+            <span>Tulis Doa & Ucapan</span>
             <ChevronRight className="w-4 h-4" />
           </div>
         </div>
       </section>
 
       {/* Real-time Event Counter Stats */}
-      <section className="grid grid-cols-3 gap-3">
-        <div className="bg-white border border-slate-200 rounded-2xl p-3.5 text-center shadow-sm">
-          <div className="flex items-center justify-center gap-1.5 text-navy-800 text-xs mb-1 font-semibold">
-            <Users className="w-3.5 h-3.5" />
-            <span>Tamu Hadir</span>
-          </div>
-          <p className="text-xl sm:text-2xl font-bold font-mono text-navy-950">
-            {stats.checkedInCount}
-          </p>
-        </div>
-
+      <section className="grid grid-cols-2 gap-3">
         <div className="bg-white border border-slate-200 rounded-2xl p-3.5 text-center shadow-sm">
           <div className="flex items-center justify-center gap-1.5 text-navy-800 text-xs mb-1 font-semibold">
             <Image className="w-3.5 h-3.5" />
-            <span>Momen Foto</span>
+            <span>Momen Foto & Video</span>
           </div>
           <p className="text-xl sm:text-2xl font-bold font-mono text-navy-950">
             {stats.momentsCount}
@@ -206,7 +164,7 @@ export function Home({ setActivePage }) {
         <div className="bg-white border border-slate-200 rounded-2xl p-3.5 text-center shadow-sm">
           <div className="flex items-center justify-center gap-1.5 text-navy-800 text-xs mb-1 font-semibold">
             <Heart className="w-3.5 h-3.5" />
-            <span>Doa Restu</span>
+            <span>Doa & Ucapan</span>
           </div>
           <p className="text-xl sm:text-2xl font-bold font-mono text-navy-950">
             {stats.wishesCount}

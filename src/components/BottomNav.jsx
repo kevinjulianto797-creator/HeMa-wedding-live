@@ -1,11 +1,10 @@
 import React from 'react';
-import { Home, QrCode, Image, MessageSquareHeart } from 'lucide-react';
+import { Home, Camera, MessageSquareHeart } from 'lucide-react';
 
 export function BottomNav({ activePage, setActivePage }) {
   const navItems = [
     { id: 'home', label: 'Beranda', icon: Home },
-    { id: 'checkin', label: 'Check-in', icon: QrCode, highlight: true },
-    { id: 'moments', label: 'Galeri', icon: Image },
+    { id: 'moments', label: 'Momen', icon: Camera, highlight: true },
     { id: 'wishes', label: 'Ucapan', icon: MessageSquareHeart },
   ];
 
